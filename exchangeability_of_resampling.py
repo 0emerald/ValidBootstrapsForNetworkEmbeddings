@@ -43,12 +43,20 @@ def unfolded_edge_resample(obs_A, T):
 def unfolded_p_matrix_resample(obs_A, T, d):
     # TODO
 
-    X_hat = single_spectral(obs_A, d=d)
+    # X_hat = single_spectral(obs_A, d=d)
+    # P_hat = X_hat @ X_hat.T
+
+    s, w = np.linalg.eig(obs_A)
+    s = np.sort(s)[::-1]
+    s = np.abs(s[:d])
+    s = np.sqrt(s)
+    X_hat = np.real(w)[:, :d] @ np.diag(s)
+
     P_hat = X_hat @ X_hat.T
 
-    # align with observed
-    P_hat_rot = procrust_align(obs_A, P_hat)
-    P_hat = P_hat_rot.copy()
+    # # align with observed
+    # P_hat_rot = procrust_align(obs_A, P_hat)
+    # P_hat = P_hat_rot.copy()
 
     As_tilde = np.zeros((T, n, n))
     for t in range(T):
@@ -59,11 +67,11 @@ def unfolded_p_matrix_resample(obs_A, T, d):
 
 
 # %%
-n = 400
+n = 200
 T = 3
 d = 2
 
-As, tau, _ = make_iid(n=n, T=1, iid_prob=0.5)
+As, tau, _ = make_iid(n=n, T=1, iid_prob=0.9)
 
 # As, tau, _ = make_temporal_simple(n=n, T=T, move_prob=0.9)
 
@@ -80,7 +88,7 @@ p_hat_list = []
 for _ in range(200):
     # Select resampling method
     # As_tilde = unfolded_edge_resample(obs_A, T)
-    As_tilde = unfolded_p_matrix_resample(obs_A, T, d=100)
+    As_tilde = unfolded_p_matrix_resample(obs_A, T, d=d)
 
     # Set the first snapshot to be the observed A as a sanity check
     As_tilde[0] = obs_A.copy()
