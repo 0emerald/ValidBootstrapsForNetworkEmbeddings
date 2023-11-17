@@ -41,7 +41,7 @@ def gaussian_ellipse(cluster):
 
 
 # %%
-n = 200
+n = 1000
 d = 2
 
 B = np.array([[0.5, 0.05], [0.05, 0.1]])
@@ -68,7 +68,7 @@ P_hat_rot = procrust_align(obs_A, P_hat)
 P_hat = P_hat_rot.copy()
 # %%
 # bootstrap
-s = 100
+s = 10
 A_star = [make_inhomogeneous_rg(P_hat) for _ in range(s)]
 # %%
 """
@@ -122,11 +122,7 @@ plt.plot(ellipse_obs_1[0], ellipse_obs_1[1], c="orchid")
 plt.grid()
 
 # legend
-plt.title(
-    "Observed and resampled embeddings with sample 95% gaussian ellipses for {} bootstrapped samples".format(
-        s
-    )
-)
+plt.title("Observed and resampled embedding with sample 95% gaussian ellipses")
 plt.scatter([], [], c="blue", label="Community 0")
 plt.scatter([], [], c="red", label="Community 1")
 plt.scatter([], [], c="cyan", label="Community 0 (resampled)")
@@ -320,6 +316,14 @@ plt.scatter(
     c=np.where(tau == 0, "blue", "red"),
     s=10,
 )
+
+# ya_true_rot = procrust_align(ya_star[1:].reshape(n * s, d), ya_true.reshape(n * s, d))
+# ya_true_rot = ya_true_rot.reshape((s, n, d))
+
+# plt.scatter(ya_true_rot[:, node, 0], ya_true_rot[:, node, 1], c="purple", s=5, alpha=1)
+
+plt.scatter(ya_star[time_1, node, 0], ya_star[time_1, node, 1], c="black", s=200)
+
 ellipse_obs_0 = gaussian_ellipse(
     ya_star[time_1, np.where(tau == 0)].reshape((int(n / 2), d))
 )
@@ -361,3 +365,62 @@ plt.scatter([], [], c="red", label="Community 1")
 # plt.scatter([], [], c="orchid", label="Community 1 (resampled)")
 plt.scatter([], [], c="orchid", label="Resampled node {}".format(node))
 _ = plt.legend()
+
+# %%
+T = s + 1
+A_star_with_obs = np.array([obs_A] + A_star)
+
+ya_star = UASE(A_star_with_obs, d, flat=False)
+ya_bootstrap = ya_star[1:, :, :].copy()
+
+ya_bootstrap_avg = np.mean(ya_bootstrap, axis=0)
+
+# plot_embedding(ya_star.reshape((n * T, d)), n, T, tau)
+
+time_1 = 0
+time_2 = 2
+
+plt.figure(figsize=(10, 10))
+plt.scatter(
+    ya_star[time_1, :, 0],
+    ya_star[time_1, :, 1],
+    c=np.where(tau == 0, "blue", "red"),
+    s=10,
+)
+ellipse_obs_0 = gaussian_ellipse(
+    ya_star[time_1, np.where(tau == 0)].reshape((int(n / 2), d))
+)
+ellipse_obs_1 = gaussian_ellipse(
+    ya_star[time_1, np.where(tau == 1)].reshape((int(n / 2), d))
+)
+plt.plot(ellipse_obs_0[0], ellipse_obs_0[1], c="blue")
+plt.plot(ellipse_obs_1[0], ellipse_obs_1[1], c="red")
+plt.scatter(
+    ya_star[time_2, :, 0],
+    ya_star[time_2, :, 1],
+    c=np.where(tau == 0, "cyan", "orchid"),
+    s=10,
+)
+ellipse_obs_0 = gaussian_ellipse(
+    ya_bootstrap_avg[np.where(tau == 0)].reshape((int(n / 2), d))
+)
+ellipse_obs_1 = gaussian_ellipse(
+    ya_bootstrap_avg[np.where(tau == 1)].reshape((int(n / 2), d))
+)
+plt.plot(ellipse_obs_0[0], ellipse_obs_0[1], c="cyan")
+plt.plot(ellipse_obs_1[0], ellipse_obs_1[1], c="orchid")
+
+# plt.xlim(-0.6, 0.6)
+# plt.ylim(-0.6, 0.6)
+
+plt.grid()
+
+# legend
+plt.title("Observed and resampled embedding with sample 95% gaussian ellipses")
+plt.scatter([], [], c="blue", label="Community 0")
+plt.scatter([], [], c="red", label="Community 1")
+plt.scatter([], [], c="cyan", label="Community 0 (resampled)")
+plt.scatter([], [], c="orchid", label="Community 1 (resampled)")
+_ = plt.legend()
+
+# %%
