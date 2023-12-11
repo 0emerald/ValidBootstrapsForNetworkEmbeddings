@@ -380,10 +380,37 @@ def make_iid_close_power(n, T=2, max_exp_deg=6, beta=2.5, change_prob=0.9, w_par
     return As
 
 
-@nb.njit()
 def make_inhomogeneous_rg(P):
     n = P.shape[0]
     A = np.random.uniform(0, 1, n**2).reshape((n, n)) < P
-    A = A.astype(int)
+    A = A.astype(float)
 
     return A
+
+
+def sbm_from_B(n, Bs, return_p=False):
+    T = len(Bs)
+    K = Bs[0].shape[0]
+
+    if n % K != 0:
+        raise Exception("n must be divisible by K")
+
+    tau = np.repeat(np.arange(0, K), int(n / K))
+    np.random.shuffle(tau)
+
+    # Generate adjacency matrices
+    As = np.zeros((T, n, n))
+    Ps = np.zeros((T, n, n))
+    for t in range(T):
+        P_t = np.zeros((n, n))
+        for i in range(n):
+            P_t[:, i] = Bs[t][tau, tau[i]]
+
+        A_t = np.random.uniform(0, 1, n**2).reshape((n, n)) < P_t
+        As[t] = A_t
+        Ps[t] = P_t
+
+    if not return_p:
+        return (As, tau)
+    else:
+        return (As, tau, Ps)

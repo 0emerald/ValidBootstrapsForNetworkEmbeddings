@@ -34,22 +34,6 @@ def gaussian_ellipse(mean, cov):
     return [x, y]
 
 
-# %%
-n = 200
-T = 3
-d = 2
-
-As, tau, _ = make_temporal_simple(n=n, T=T, move_prob=0.5)
-ya = UASE(As, d, flat=False)
-
-node_of_interest = 0
-node_positions = ya[:, node_of_interest, :]
-
-# %%
-# Resampling
-obs_A = As[0].copy()
-
-
 def unfolded_resample(obs_A, T):
     """First snapshot is the observed A, the rest are resampled"""
     # Get a list of edges from the adjacency matrix
@@ -76,57 +60,54 @@ def unfolded_resample(obs_A, T):
     return As_tilde
 
 
-As_tilde = unfolded_resample(obs_A, T)
+def unfolded_p_matrix_resample(obs_A, T, d):
+    # TODO
+
+    X_hat = single_spectral(obs_A, d=d)
+    P_hat = X_hat @ X_hat.T
+
+    As_tilde = np.zeros((T, n, n))
+    for t in range(T):
+        A_tilde = np.random.uniform(0, 1, n**2).reshape((n, n)) < P_hat
+        As_tilde[t] = A_tilde
+
+    return As_tilde
+
+
+# %%
+n = 200
+T = 3
+d = 2
+
+# As, tau, _ = make_temporal_simple(n=n, T=T, move_prob=0.9)
+As, tau, _ = make_iid(n=n, T=T, iid_prob=0.9)
+ya = UASE(As, d, flat=False)
+
+node_of_interest = 0
+node_positions = ya[:, node_of_interest, :]
+
+# %%
+# Resampling
+obs_A = As[0].copy()
+
+
+# As_tilde = unfolded_resample(obs_A, T)
+As_tilde = unfolded_p_matrix_resample(obs_A, T, d)
 
 ya_tilde = UASE(As_tilde, d, flat=True)
 
-# %%
-# Check that we keep exchangeability
-p_hat_list = []
-
-for _ in range(200):
-    As_tilde = unfolded_resample(obs_A, T)
-    ya_tilde = UASE(As_tilde, d, flat=False)
-
-    ya1 = ya_tilde[1]
-    ya2 = ya_tilde[2]
-
-    # Paired displacement testing
-    p_hat = test_temporal_displacement_two_times(
-        np.row_stack([ya1, ya2]), n=ya1.shape[0]
-    )
-    p_hat_list.append(p_hat)
-
-
-roc = []
-alphas = []
-for alpha in np.linspace(0, 1, len(p_hat_list)):
-    alphas.append(alpha)
-    num_below_alpha = sum(p_hat_list < alpha)
-    roc_point = num_below_alpha / len(p_hat_list)
-    roc.append(roc_point)
-
-# Get the power at the 5% significance level
-power_significance = 0.05
-power_idx = alphas.index(min(alphas, key=lambda x: abs(x - power_significance)))
-power = roc[power_idx]
-print("Power: {}".format(power))
-
-plt.figure()
-plt.plot(alphas, roc)
-plt.plot([0, 1], [0, 1], "--", color="black")
 
 # %%
 degrees_obs = np.sum(obs_A, axis=0)
 degrees_tilde = np.sum(As_tilde[-1], axis=0)
-# degrees_tilde_2 = np.sum(As_tilde[-10], axis=0)
+degrees_tilde_2 = np.sum(As_tilde[-2], axis=0)
 
 # plot the sorted degrees (descending)
 plt.figure()
 plt.title("Sorted Degrees")
 plt.plot(np.sort(degrees_obs)[::-1], label="obs")
 plt.plot(np.sort(degrees_tilde)[::-1], label="tilde")
-# plt.plot(np.sort(degrees_tilde_2)[::-1], label="tilde 2")
+plt.plot(np.sort(degrees_tilde_2)[::-1], label="tilde 2")
 plt.legend()
 
 # %%
@@ -142,8 +123,8 @@ ya_tilde_new = ya_tilde_rot_flat.reshape((T, n, d))
 ya_tilde = ya_tilde_new.copy()
 ya_tilde_flat = ya_tilde.reshape((T * n, d))
 
-node_of_interest = 0
-node_positions_tilde = ya_tilde[:, node_of_interest, :]
+# node_of_interest = 0
+# node_positions_tilde = ya_tilde[:, node_of_interest, :]
 
 
 # %%
@@ -152,8 +133,8 @@ node_positions_tilde = ya_tilde[:, node_of_interest, :]
 # obs_ya = ya_tilde[0]
 # resample_ya = ya_tilde[1]
 
-obs_ya = xa_normal
-resample_ya = xa_tilde
+obs_ya = ya_flat
+resample_ya = ya_tilde_flat
 # resample_ya = ya_tilde[1]
 
 mean_tilde_flat_1 = np.mean(resample_ya[np.where(tau == 0)], axis=0)
