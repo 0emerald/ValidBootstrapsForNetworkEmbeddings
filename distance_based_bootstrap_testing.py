@@ -18,7 +18,6 @@ REALITY CHECKS
     iid data
 2. Make sure that it works on systems beyond SBM
 
-
 SUMMARY OF STUFF I'VE DONE
 - Got to the point where we can look at p-values to see if the embedding at the next time point has 
     changed significantly from the previous one relative to bootstrapped embeddings
