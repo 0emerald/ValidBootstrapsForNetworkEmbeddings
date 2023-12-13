@@ -15,7 +15,11 @@ We have a lemma that states that for [a high enough] $n$, $\hat{\mathbf{X}}$ wil
 ### Next steps
 
 -   [ ] Make concrete the condition on $n$ to avoid the P matrix problem.
--   [ ] Can we go as far as to define the distribution of boostrapped samples under spectral embedding? (This will presumably look something like $\mathcal{N}(\mathbf{X}_{i}, d \hat{\sigma}_{i})$ for $n$ satisfying the non-saturation condition.
+-   [ ] We need to see one embedding and all it's bootstrap values, for multiple nodes, and plot also a line of its variance (which we know bc we know the distribution we sample it from)
+-   [ ] Figure out why when the SBM model is more difficult (comms are closer e.g.) our bootstrapping fails.
+-   [ ] Write up in maths what our bootstrap procedure is. - it is currently parametric, but we should document this properly. 
+-   [ ] 
+-   [ ] Can we go as far as to define the distribution of boostrapped samples under spectral embedding? (This will presumably look something like $\mathcal{N}(\mathbf{X}_{i},d\hat{\sigma}_{i})$ for $n$ satisfying the non-saturation condition.
 -   [ ] Define some metric of how well a boostrap does.
 -   [ ] Do other bootstrapping methods produce better results?
 -   [ ] Apply to real data example (Emerald's data)
