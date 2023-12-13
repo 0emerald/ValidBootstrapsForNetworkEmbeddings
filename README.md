@@ -19,3 +19,6 @@ We have a lemma that states that for [a high enough] $n$, $\hat{\mathbf{X}}$ wil
 -   [ ] Define some metric of how well a boostrap does.
 -   [ ] Do other bootstrapping methods produce better results?
 -   [ ] Apply to real data example (Emerald's data)
+
+exchangeability_of_resampling.py: tests a given resampling method to see if its valid. I.e. resampled adjacencies produce exchangeable embeddings under UASE.
+variance_estimation.py: currently uselesss...
