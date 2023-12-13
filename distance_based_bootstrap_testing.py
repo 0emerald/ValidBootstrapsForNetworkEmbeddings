@@ -34,15 +34,19 @@ SUMMARY OF STUFF I'VE DONE
 n = 500
 T = 2
 d = 2
-As, tau, _ = make_iid(n, T, iid_prob=0.65)
+As, tau, _ = make_iid(n, T, iid_prob=0.85)
 # As, tau, _ = make_temporal_simple(n, T, move_prob=0.9)
 
 # ya = UASE(As, d, flat=False)
 # %%
 # Bootstrap first time point B times using parametric bootstrap
-B = 200
+B = 100
 X_hat = single_spectral(As[0], d)
 P_hat = X_hat @ X_hat.T
+
+if np.min(P_hat) < 0 or np.max(P_hat) > 1:
+    print("Warning: P_hat is not a valid probability matrix")
+
 A_star = [make_inhomogeneous_rg(P_hat) for _ in range(B)]
 
 A_star_with_obs = np.array(list(As) + A_star)
@@ -119,8 +123,8 @@ _ = plt.title("P-values for community {}".format(community_of_interest))
 # Plot the embedding of the first time point with one of its boostrapped versions
 plt.figure()
 
-plt.scatter(ya[0, tau == 0, 0], ya[0, tau == 0, 1], color="C0")
-plt.scatter(ya[0, tau == 1, 0], ya[0, tau == 1, 1], color="C1")
+plt.scatter(ya[0, tau == 0, 0], ya[0, tau == 0, 1], color="C0", alpha=0.4)
+plt.scatter(ya[0, tau == 1, 0], ya[0, tau == 1, 1], color="C1", alpha=0.4)
 
 plt.scatter(ya_star[2, tau == 0, 0], ya_star[2, tau == 0, 1], color="blue", alpha=0.4)
 plt.scatter(ya_star[2, tau == 1, 0], ya_star[2, tau == 1, 1], color="red", alpha=0.4)
