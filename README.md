@@ -15,6 +15,7 @@ We have a lemma that states that for [a high enough] $n$, $\hat{\mathbf{X}}$ wil
 ### Next steps
 
 -   [ ] Make concrete the condition on $n$ to avoid the P matrix problem.
+-   [ ] FIX BOOTSTRAP CODE AS IT DOES NOT SPAN THE TRUE OBS
 -   [ ] We need to see one embedding and all it's bootstrap values, for multiple nodes, and plot also a line of its variance (which we know bc we know the distribution we sample it from)
 -   [ ] Figure out why when the SBM model is more difficult (comms are closer e.g.) our bootstrapping fails.
 -   [ ] Write up in maths what our bootstrap procedure is. - it is currently parametric, but we should document this properly.
@@ -22,6 +23,7 @@ We have a lemma that states that for [a high enough] $n$, $\hat{\mathbf{X}}$ wil
 -   [ ] trying to bound something we didnt observe with something we did observe (the varaince), how do we get a bound and how is it a functoin of the thing we did observe? VI? are we systematically biased?
 -   [ ] If $p$ is small or big, you have a higher chance of being pulled to or away from the origin???? variance at the origin is 0. stochastic problem, low  degree nodes we maybe underpredict their variance? Dan says there is an explanation for systematic varaince problem close to the origin
 -   [ ] replace P by an estimate of the upper bound of P. can make an upper bound on degree. n=4 edges comes from some BInomial(N,p), N is number of nodes in data, p is true p. , whats a theoretical max of p, so a C.I for (1-p)p, ie the max varaince for hte binomial.
+-   [ ] IN THE worst case we want ot be conservative but we defo dont want to be superuniform 
 -   [ ] 
 -   [ ] We should exclude self edges, $p_{ii}$ =0, convention? who cares
 -   [ ] 
