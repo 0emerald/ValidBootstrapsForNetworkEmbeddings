@@ -6,7 +6,7 @@ Here we want to take one observed A matrix, and create replicates that we believ
 
 Have code that uses parametric bootstrap and returns a p-value distribution as to whether a new point, $\hat{\mathbf{Y}}_{i}^{(2)}$ is from the same distribution as $\hat{\mathbf{Y}}^{(1)}_i, \tilde{\mathbf{Y}}_i^{(1)}, \dots, \tilde{\mathbf{Y}}_i^{(B)}$.
 
-    In theory it's a procedure that can define some uncertainty on each node without assuming constant variance.
+In theory it's a procedure that can define some uncertainty on each node without assuming constant variance.
 
 This can be used to empirically verify if the procedure is valid. Currently it is not when n=500 and iid_prob=0.65. This is possibly due to the $P$ problem, where $\hat{\mathbf{P}} \notin [0,1]$.
 
