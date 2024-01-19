@@ -1,9 +1,12 @@
 # %%
+from tqdm import tqdm
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from embedding_functions import *
 from experiment_setup import *
+import gc
+from functions_for_bootstrap import parametric_bootstrap
 
 # %%
 """
@@ -29,128 +32,177 @@ SUMMARY OF STUFF I'VE DONE
 - May need to look at some theory to make it generally valid.
 
 """
+
 # %%
-# Generate an SBM of two communities
-n = 500
+####################
+# This plot looks really weird.
+# In most of the examples the original sample seems to be on the edge of the bootstrap samples
+# I'd expect it to be in the middle
+####################
+i = 15
+plt.scatter(
+    ya_both[1:100, i, 0], ya_both[1:100, i, 1], color="green", label="True Resample"
+)
+plt.scatter(ya_both[100:, i, 0], ya_both[100:, i, 1], color="blue", label="Bootstrap")
+plt.scatter(ya_both[0, i, 0], ya_both[0, i, 1], color="red", label="Original")
+
+plt.legend()
+# %%
 T = 2
 d = 2
-As, tau, _ = make_iid(n, T, iid_prob=0.85)
-# As, tau, _ = make_temporal_simple(n, T, move_prob=0.9)
+# n_to_try = [100, 200, 500, 1500, 2000]
+n_to_try = [2500]
 
-# ya = UASE(As, d, flat=False)
-# %%
-# Bootstrap first time point B times using parametric bootstrap
-B = 100
-X_hat = single_spectral(As[0], d)
-P_hat = X_hat @ X_hat.T
+power_list = []
 
-if np.min(P_hat) < 0 or np.max(P_hat) > 1:
-    print("Warning: P_hat is not a valid probability matrix")
+B = 50
 
-A_star = [make_inhomogeneous_rg(P_hat) for _ in range(B)]
+for n in n_to_try:
+    ####################################################################
+    # ## USING ONLINE EMBEDDING FOR MEMORY EFFICIENCY ##
 
-A_star_with_obs = np.array(list(As) + A_star)
+    # SBM
+    # As, tau = make_iid(n, T, iid_prob=0.55)  # Easier to bootstrap
+    # As, tau = make_iid(n, T, iid_prob=0.9)  # Harder to bootstrap (often conservative)
 
-ya_star_with_obs = UASE(A_star_with_obs, d, flat=False)
-ya_star = ya_star_with_obs[2:].copy()
-ya = ya_star_with_obs[:2].copy()
+    # # Embed the first time point
+    # ya = UASE(As[:2], d, flat=False, sparse_matrix=False)
+    # xa = ya[0].copy()
+    # xa_inv = xa @ np.linalg.inv(xa.T @ xa)
 
-
-# %%
-# Estimate sigma hat for each node
-sigma_hats = np.zeros((n, d, d))
-for i in range(n):
-    sigma_hats[i] = np.cov(ya_star[:, i, :].T)
-
-
-# # %%
-# # Plot the differences to make sure that they look sensible
-# i = 0
-# new_point = ya[0, i, :] - ya[1, i, :]
-
-# bootstrap_points = np.zeros((B, d))
-# for b in range(B):
-#     bootstrap_points[b] = ya[0, i, :] - ya_star[b, i, :]
-
-# plt.figure()
-# plt.scatter(bootstrap_points[:, 0], bootstrap_points[:, 1], color="C0")
-# plt.scatter(new_point[0], new_point[1], color="red")
-
-
-# %%
-# Hypothesis test to check whether the observed difference is significant with respect to the
-#  bootstrap samples
-
-p_hat_list = []
-community_of_interest = 0
-for i in np.where(tau == community_of_interest)[0]:
-    observed = np.linalg.norm(ya[0, i, :] - ya[1, i, :])
-
-    all_tests = []
-    all_tests.append(observed)
+    # # Bootstrap first time point B times using parametric bootstrap
+    # ya_star = np.zeros((B, n, d))
     # for b in range(B):
-    #     all_tests.append(np.linalg.norm(ya[0, i, :] - ya_star[b, i, :]))
+    #     A_star = parametric_bootstrap(As[0], d, B=1, sparse=False)
+    #     ya_star[b] = A_star[0].T @ xa_inv
 
-    sigma_hat = sigma_hats[i]
-    for b in range(B):
-        # Draw a bunch of samples from a normal dist and use a hypothesis test to check if the
-        #  observed difference is significant
-        normal_sample = np.random.multivariate_normal(
-            np.zeros(d), d * (sigma_hat), size=1
-        ).flatten()
-        all_tests.append(np.linalg.norm(normal_sample))
+    #     del A_star
+    ####################################################################
 
-    # Are new_point and bootstrap_points from the same distribution?
-    p_hat = 1 / (B + 1) * np.sum(all_tests >= observed)
-    p_hat_list.append(p_hat)
+    # ####################################################################
+    # ## NORMAL WAY OF PARAMETRIC BOOTSTRAP ##
 
-# Plot the ROC curve
-alphas_list = []
-roc = []
-alphas = []
-for alpha in np.linspace(0, 1, 100):
-    alphas.append(alpha)
-    num_below_alpha = sum(p_hat_list < alpha)
-    roc_point = num_below_alpha / len(p_hat_list)
-    roc.append(roc_point)
+    # # SBM
+    # As, tau = make_iid(n, T, iid_prob=0.55)  # Easier to bootstrap
+    # # As, tau = make_iid(n, T, iid_prob=0.9)  # Harder to bootstrap (often conservative)
 
-plt.plot(np.linspace(0, 1, 2), np.linspace(0, 1, 2), linestyle="--", c="grey")
-_ = plt.plot(alphas, roc)
-_ = plt.title("P-values for community {}".format(community_of_interest))
+    # A_star = parametric_bootstrap(As[0], d, B=B, sparse=False)
+    # A_star_with_obs = np.concatenate((As, A_star), axis=0)
 
+    # # Embed all graphs
+    # ya_star_with_obs = UASE(A_star_with_obs, d, flat=False, sparse_matrix=False)
+    # ya_star = ya_star_with_obs[2:].copy()  # Bootstrap embedding
+    # ya = ya_star_with_obs[:2].copy()  # Embedding of observed T graphs
+
+    # ####################################################################
+
+    #################
+    ## SPARSE WAY OF PARAMETRIC BOOTSTRAP ##
+    As, tau = make_iid_sparse(n, T, iid_prob=0.55)
+    A_star = parametric_bootstrap(As[0], d, B=B, sparse=True)
+
+    A_star_with_obs = []
+    A_star_with_obs.extend(As)
+    A_star_with_obs.extend(A_star)
+
+    # Embed all graphs
+    ya_star_with_obs = UASE(A_star_with_obs, d, flat=False, sparse_matrix=True)
+    ya_star = ya_star_with_obs[2:].copy()  # Bootstrap embedding
+    ya = ya_star_with_obs[:2].copy()  # Embedding of observed T graphs
+
+    #################
+
+    # Estimate sigma hat for each node using the embeddings of the bootstrapped graphs
+    sigma_hats = np.zeros((n, d, d))
+    for i in range(n):
+        sigma_hats[i] = np.cov(ya_star[:, i, :].T)
+
+    # Make sure sigma_hats are not nan (likely B=1, make it at least 2)
+    assert np.sum(np.isnan(sigma_hats)) == 0
+
+    # Hypothesis test to check whether the observed difference is significant with respect to the
+    #  bootstrap samples
+    p_hat_list = []
+    observed_values = []
+    community_of_interest = 0
+    for i in np.where(tau == community_of_interest)[0]:
+        observed = np.linalg.norm(ya[0, i, :] - ya[1, i, :])
+        observed_values.append(observed)
+
+        all_tests = []
+        all_tests.append(observed)
+
+        sigma_hat = sigma_hats[i]
+        for b in range(B):
+            # Draw a bunch of samples from a normal dist and use a hypothesis test to check if the
+            #  observed difference is significant
+            # This is because we expect the difference between the two embeddings to be normally
+            #  distributed with mean 0 and variance 4 sigma_hat
+
+            # 4 here because we do (Y1 - Ytrue) + (Y0 - Ytrue) (4 combos)
+            normal_sample = np.random.multivariate_normal(
+                np.zeros(d), 4 * (sigma_hat), size=1
+            ).flatten()
+            all_tests.append(np.linalg.norm(normal_sample))
+
+        # Are new_point and bootstrap_points from the same distribution?
+        p_hat = 1 / (B + 1) * np.sum(all_tests >= observed)
+        p_hat_list.append(p_hat)
+
+    # Plot the ROC curve
+    alphas_list = []
+    roc = []
+    alphas = []
+    for alpha in np.linspace(0, 1, 100):
+        alphas.append(alpha)
+        num_below_alpha = sum(p_hat_list < alpha)
+        roc_point = num_below_alpha / len(p_hat_list)
+        roc.append(roc_point)
+
+    # Get the power at the 5% significance level
+    power_significance = 0.05
+    power_idx = alphas.index(min(alphas, key=lambda x: abs(x - power_significance)))
+    power = roc[power_idx]
+    power_list.append(power)
+    print("n: {}, power: {}".format(n, power))
+
+    plt.plot(np.linspace(0, 1, 2), np.linspace(0, 1, 2), linestyle="--", c="grey")
+    _ = plt.plot(alphas, roc)
+    _ = plt.title("P-values for community {}".format(community_of_interest))
 
 # %%
 # Plot the embedding of the first time point with one of its boostrapped versions
 plt.figure()
 
-plt.scatter(ya[0, tau == 0, 0], ya[0, tau == 0, 1], color="C0", alpha=0.4)
-plt.scatter(ya[0, tau == 1, 0], ya[0, tau == 1, 1], color="C1", alpha=0.4)
+# plt.figure()
+plt.scatter(
+    ya_star[2, tau == 0, 0],
+    ya_star[2, tau == 0, 1],
+    color="blue",
+    alpha=0.4,
+    label=r"Bootstrap $\tau=0$",
+)
+plt.scatter(
+    ya_star[2, tau == 1, 0],
+    ya_star[2, tau == 1, 1],
+    color="red",
+    alpha=0.4,
+    label=r"Bootstrap $\tau=1$",
+)
+plt.scatter(
+    ya[0, tau == 0, 0],
+    ya[0, tau == 0, 1],
+    color="C0",
+    alpha=0.4,
+    label=r"Original $\tau=0$",
+)
+plt.scatter(
+    ya[0, tau == 1, 0],
+    ya[0, tau == 1, 1],
+    color="C1",
+    alpha=0.4,
+    label=r"Original $\tau=1$",
+)
 
-plt.scatter(ya_star[2, tau == 0, 0], ya_star[2, tau == 0, 1], color="blue", alpha=0.4)
-plt.scatter(ya_star[2, tau == 1, 0], ya_star[2, tau == 1, 1], color="red", alpha=0.4)
 
-
-# %%
-plt.figure()
-
-plt.scatter(ya_star[:, 0, 0], ya_star[:, 0, 1], color="black")
-plt.scatter(ya[0, 0, 0], ya[0, 0, 1], color="red")
-
-# %%
-# Compare to true
-As_true, tau, _ = make_iid(n, 100, iid_prob=0.9)
-
-B = 100
-X_hat = single_spectral(As_true[0], d)
-P_hat = X_hat @ X_hat.T
-As_star = [make_inhomogeneous_rg(P_hat) for _ in range(B)]
-
-As_both = np.array(list(As_true) + As_star)
-
-ya_both = UASE(As_both, d, flat=False)
-# %%
-plt.scatter(ya_both[0, i, 0], ya_both[0, i, 1], color="red")
-plt.scatter(ya_both[1:100, i, 0], ya_both[1:100, i, 1], color="green")
-plt.scatter(ya_both[100:, i, 0], ya_both[100:, i, 1], color="blue")
-
-# %%
+plt.legend()

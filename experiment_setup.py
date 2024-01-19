@@ -1,5 +1,6 @@
 import numpy as np
 import numba as nb
+from scipy import sparse
 
 
 @nb.njit()
@@ -119,12 +120,6 @@ def make_iid(n, T=2, iid_prob=0.4):
     # Generate B matrix
     B = np.array([[0.5, 0.5], [0.5, iid_prob]])
 
-    # If T is not even, round down T/2 for the changepoint
-    if T % 2 == 0:
-        changepoint = int(T / 2)
-    else:
-        changepoint = int(np.floor(T / 2))
-
     # Generate adjacency matrices
     As = np.zeros((T, n, n))
     for t in range(T):
@@ -135,7 +130,47 @@ def make_iid(n, T=2, iid_prob=0.4):
         A_t = np.random.uniform(0, 1, n**2).reshape((n, n)) < P_t
         As[t] = A_t
 
-    return (As, tau, changepoint)
+    return (As, tau)
+
+
+def make_iid_sparse(n, T=2, iid_prob=0.4):
+    """
+    Generates a series of nxn i.i.d. stochastic block model adjacency matrices
+
+    Inputs
+    n: number of nodes
+    T: number of time points
+    iid_prob: within-community edge probability for one of the communities (0.5 means the two are indisinguishable)
+
+    Outputs
+    As: Series of adjacency matrices (T, n, n)
+    tau: Community assignments (n)
+    changepoint: Middle of the series (variable exists to be in line with the other functions)
+    """
+
+    # Ensure equal community sizes
+    K = 2
+    if n % K != 0:
+        raise ValueError("n must be divisible by the number of communities")
+
+    tau = np.repeat(np.arange(0, K), int(n / K))
+    np.random.shuffle(tau)
+
+    # Generate B matrix
+    B = np.array([[0.5, 0.5], [0.5, iid_prob]])
+
+    As = []
+    for t in range(T):
+        P_t = np.zeros((n, n))
+        for i in range(n):
+            P_t[:, i] = B[tau, tau[i]]
+
+        A_t = sparse.csr_matrix(
+            np.random.uniform(0, 1, n**2).reshape((n, n)) < P_t
+        ).astype(float)
+        As.append(A_t)
+
+    return (As, tau)
 
 
 @nb.njit()
@@ -380,11 +415,36 @@ def make_iid_close_power(n, T=2, max_exp_deg=6, beta=2.5, change_prob=0.9, w_par
     return As
 
 
+@nb.njit()
 def make_inhomogeneous_rg(P):
     n = P.shape[0]
-    A = np.random.uniform(0, 1, n**2).reshape((n, n)) < P
-    A = A.astype(float)
+    A = np.zeros((n, n), dtype=np.float64)
+    for i in range(n):
+        for j in range(n):
+            A[i, j] = np.random.uniform(0, 1) < P[i, j]
+    return A
 
+
+# def make_inhomogeneous_rg_sparse(P):
+#     n = P.shape[0]
+#     A = sparse.lil_matrix((n, n), dtype=np.float64)
+#     for i in range(n):
+#         for j in range(n):
+#             A[i, j] = np.random.uniform(0, 1) < P[i, j]
+#     return A
+
+# def new_make_inhomogeneous_rg_sparse(P):
+#     n = P.shape[0]
+#     random_values = np.random.uniform(0, 1, (n, n))
+#     A = sparse.lil_matrix((n, n), dtype=np.float64)
+#     A.data = (random_values < P).astype(float)
+#     return A
+
+
+def make_inhomogeneous_rg_sparse(P):
+    n = P.shape[0]
+    random_values = np.random.uniform(0, 1, (n, n))
+    A = sparse.csr_matrix((random_values < P).astype(np.float64))
     return A
 
 

@@ -130,6 +130,7 @@ def UASE(As, d, flat=True, sparse_matrix=False, return_left=False):
     T = len(As)
 
     # Construct the rectangular unfolded adjacency
+    # TODO forming A could be faster
     if sparse_matrix:
         A = As[0]
         for t in range(1, T):
