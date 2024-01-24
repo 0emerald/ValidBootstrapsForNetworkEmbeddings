@@ -425,26 +425,11 @@ def make_inhomogeneous_rg(P):
     return A
 
 
-# def make_inhomogeneous_rg_sparse(P):
-#     n = P.shape[0]
-#     A = sparse.lil_matrix((n, n), dtype=np.float64)
-#     for i in range(n):
-#         for j in range(n):
-#             A[i, j] = np.random.uniform(0, 1) < P[i, j]
-#     return A
-
-# def new_make_inhomogeneous_rg_sparse(P):
-#     n = P.shape[0]
-#     random_values = np.random.uniform(0, 1, (n, n))
-#     A = sparse.lil_matrix((n, n), dtype=np.float64)
-#     A.data = (random_values < P).astype(float)
-#     return A
-
-
 def make_inhomogeneous_rg_sparse(P):
     n = P.shape[0]
     random_values = np.random.uniform(0, 1, (n, n))
     A = sparse.csr_matrix((random_values < P).astype(np.float64))
+    del random_values
     return A
 
 

@@ -12,6 +12,9 @@ To do
 - [ ] Sparse option returns a list of sparse matrices
 - [ ] Non sparse option is dense
 
+* testing function
+- [ ] Make sure that it's uniform when graphs are true resamples
+
 """
 
 
