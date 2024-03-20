@@ -8,7 +8,29 @@ from tqdm import tqdm
 import numba as nb
 
 
-def parametric_bootstrap(A, d, B, return_P_hat=False, sparse=False, verbose=True):
+def plot_power(p_hat_list):
+    # Plot the ROC curve
+    roc = []
+    alphas = []
+    for alpha in np.linspace(0, 1, 100):
+        alphas.append(alpha)
+        num_below_alpha = sum(p_hat_list < alpha)
+        roc_point = num_below_alpha / len(p_hat_list)
+        roc.append(roc_point)
+
+    # Get the power at the 5% significance level
+    power_significance = 0.05
+    power_idx = alphas.index(min(alphas, key=lambda x: abs(x - power_significance)))
+    power = roc[power_idx]
+
+    plt.plot(np.linspace(0, 1, 2), np.linspace(0, 1, 2), linestyle="--", c="grey")
+    _ = plt.plot(alphas, roc)
+    plt.show()
+
+    return power
+
+
+def parametric_bootstrap(A, d, B, return_P_hat=False, sparse=False, verbose=False):
     """
     Generates B bootstrapped adjacency matrices from a single adjacency matrix A.
 
@@ -36,10 +58,10 @@ def parametric_bootstrap(A, d, B, return_P_hat=False, sparse=False, verbose=True
 
     if verbose:
         if not sparse:
-            A_star = np.array([make_inhomogeneous_rg(P_hat) for _ in tqdm(range(B))])
+            A_star = np.array([make_inhomogeneous_rg(P_hat) for _ in range(B)])
         else:
             A_star = np.array(
-                [make_inhomogeneous_rg_sparse(P_hat) for _ in tqdm(range(B))]
+                [make_inhomogeneous_rg_sparse(P_hat) for _ in range(B)]
             )
     else:
         if not sparse:
@@ -51,6 +73,52 @@ def parametric_bootstrap(A, d, B, return_P_hat=False, sparse=False, verbose=True
         return A_star, P_hat
     else:
         return A_star
+
+
+def row_sample_with_replacement(A, B):
+    """
+    Implemented for just a single bootstrap sample for now
+
+    input:
+    A: (numpy array (n, n)) adjacency matrix
+    B: (int) number of bootstrap samples to take
+
+    output:
+    A_star: (numpy array (B, n, n)) bootstrapped adjacency matrices
+    """
+
+    # this is the number of nodes
+    n = A.shape[0]
+
+    # initialize an array to store the bootstrapped adjacency matrices
+    A_row_jumbles = np.zeros((B,n,n))
+
+    for i in range(B):
+        # for each bootstrap sample, select which rows to put in the new matrix
+        idx = np.random.choice(n, size=n, replace=True)
+        for j in range(n):
+            # put the rows in the new matrix
+            A_row_jumbles[i][j,:] += A[idx[j],:]
+
+    return A_row_jumbles
+
+
+def edgelist_jackknife(A, B. num_times):
+    """
+    Pick a random entry and set it to zero
+    """
+    n = A.shape[0]
+    A_star = np.zeros((B, n, n))
+
+    for i in range(B):
+        A_star[i] = A.copy()
+        for j in range(num_times):
+            idx = np.random.choice(n, size=2, replace=True)
+            A_star[i][idx[0], idx[1]] = 0
+            A_star[i][idx[1], idx[0]] = 0
+
+    return A_star
+
 
 
 # NOTE this is garbage. it don't work
