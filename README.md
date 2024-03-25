@@ -20,10 +20,10 @@ A procedure that evaluates how well a bootstrap replicate follows the true under
 
 ## To do
 
--   [ ] Dive into the literature to find relevant bootstrap procedures.
+-   [ ] Dive into the literature to find relevant bootstrap procedures. for matrices! preferably adjacency matrices. 
 -   [ ] Plot these procedures in p-value space (some will be super-uniform, some sub-uniform, can we predict where a given procedure will land?)
 -   [ ] Can we find a way of exploiting our stability test to make our own bootstrap procedure that beats the others. - this is very hard, ask Dan about this. #
--   [ ] Exchangeability is proved for a symmetric f:[0,1]^2->R (??) and I think Ian extends this to weighted things, but is it somewhere,, or must we prove it holds, for weighted and directed graphs
+-   [ ] Exchangeability is proved for a symmetric f:[0,1]^2->R (??) and I think Ian extends this to weighted things, but is it somewhere,, or must we prove it holds, for weighted and directed graphs. Note which proofs we want to leverage. 
 -   [ ] Feature matrices can be seen as weighted directed matrices, but not square. No we like adjacency matrices
 -   [ ] Make some nice maths definition that exchangeable embeddings from UASE, so a spectral unfolding, provides adjacency matrices we believe follow the same underlying distribution, if they satisfy our testing procedure.
 -   [ ] 
