@@ -103,7 +103,7 @@ def row_sample_with_replacement(A, B):
     return A_row_jumbles
 
 
-def edgelist_jackknife(A, B. num_times):
+def edgelist_jackknife(A, B, num_times):
     """
     Pick a random entry and set it to zero
     """
