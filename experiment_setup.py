@@ -26,7 +26,6 @@ def make_temporal_simple(n, T=2, move_prob=0.53, K=2):
         raise ValueError("n must be divisible by the number of communities")
 
     tau = np.repeat(np.arange(0, K), int(n / K))
-    np.random.shuffle(tau)
 
     # Generate B matrices
     B_list = np.zeros((2, K, K))
@@ -115,7 +114,6 @@ def make_iid(n, T=2, iid_prob=0.4):
         raise ValueError("n must be divisible by the number of communities")
 
     tau = np.repeat(np.arange(0, K), int(n / K))
-    np.random.shuffle(tau)
 
     # Generate B matrix
     B = np.array([[0.5, 0.5], [0.5, iid_prob]])
@@ -130,7 +128,7 @@ def make_iid(n, T=2, iid_prob=0.4):
         A_t = np.random.uniform(0, 1, n**2).reshape((n, n)) < P_t
         As[t] = A_t
 
-    return (As, tau)
+    return (As, tau, P_t)
 
 
 def make_iid_sparse(n, T=2, iid_prob=0.4):
