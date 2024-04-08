@@ -8,7 +8,7 @@ from tqdm import tqdm
 import numba as nb
 
 
-def plot_power(p_hat_list):
+def plot_power(p_hat_list, plot=True):
     # Plot the ROC curve
     roc = []
     alphas = []
@@ -23,11 +23,13 @@ def plot_power(p_hat_list):
     power_idx = alphas.index(min(alphas, key=lambda x: abs(x - power_significance)))
     power = roc[power_idx]
 
-    plt.plot(np.linspace(0, 1, 2), np.linspace(0, 1, 2), linestyle="--", c="grey")
-    _ = plt.plot(alphas, roc)
-    plt.show()
+    if plot:
+        plt.plot(np.linspace(0, 1, 2), np.linspace(0, 1, 2), linestyle="--", c="grey")
+        _ = plt.plot(alphas, roc)
+        plt.show()
 
     return power
+
 
 
 def parametric_bootstrap(A, d, B, return_P_hat=False, sparse=False, verbose=False):
