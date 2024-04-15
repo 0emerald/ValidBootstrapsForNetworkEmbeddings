@@ -12,6 +12,10 @@ This can be used to empirically verify if the procedure is valid. Currently it i
 
 We have a lemma that states that for [a high enough] $n$, $\hat{\mathbf{X}}$ will be sufficiently close to $\tilde{\mathbf{X}}$ such that $\hat{\mathbf{X}} \hat{\mathbf{X}}^{\top} \in [0,1]$. The condition on $n$ needs to be made concrete.
 
+15April2024 update: 
+* Have a kNN based bootstrap method, and a test to compare how well this performs. Can think of it as a "local" bootstrap, not global like $\hat{\mathbf{P}}=\hat{\mathbf{X}}\hat{\mathbf{X}}^{\top}$.
+* KL divergence to see how well the bootstraps per node approximate the distribution of the node when compared with the distribution found from many samples from the true dist, in the space of the embedding. 
+
 ## Trying to do 
 Find bootstraps that work to replicate embeddings well 
 A procedure that evaluates how well a bootstrap replicate follows the true underlying distribution of the observation, for the case where only a single observation is made. 
