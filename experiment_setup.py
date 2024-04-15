@@ -398,19 +398,22 @@ def make_iid_close_power(n, T=2, max_exp_deg=6, beta=2.5, change_prob=0.9, w_par
 
     # Generate adjacency matrices
     As = np.zeros((T, n, n))
+    Ps = np.zeros((T, n, n))
     for t in range(0, changepoint):
         P_t = W * prob_for_times[0]
 
         A_t = np.random.uniform(0, 1, n**2).reshape((n, n)) < P_t
         As[t] = A_t
+        Ps[t] = P_t
 
     for t in range(changepoint, T):
         P_t = W * prob_for_times[1]
 
         A_t = np.random.uniform(0, 1, n**2).reshape((n, n)) < P_t
         As[t] = A_t
+        Ps[t] = P_t
 
-    return As
+    return As, Ps
 
 
 @nb.njit()
@@ -457,3 +460,33 @@ def sbm_from_B(n, Bs, return_p=False):
         return (As, tau)
     else:
         return (As, tau, Ps)
+
+
+@nb.njit()
+def make_MMSBM(n, K):
+
+    # Generate B matrix - this has 0.2 for all off-diagonal entries
+    B = np.ones((K, K)) * 0.2
+    comm_probs = np.linspace(0.3, 0.9, K)
+    np.fill_diagonal(B, comm_probs)
+
+    # make all the pi vectors (n of them)
+    pi_list = []
+    largest_prob = []
+    for i in range(n):
+        # pi is a random probability vector of length K
+        pi = np.random.dirichlet(np.ones(K)).reshape((K, 1))
+        pi_list.append(pi)
+        largest_prob.append(np.argmax(pi))
+
+    # (pi_list[0].T @ B @ pi_list[1])[0][0]
+
+    P = np.zeros((n, n))
+    for i in range(n):
+        for j in range(n):
+            # this really should be pi[i] and pi[j] but since pi_i = pi_j for all i,j we don't bother
+            P[i,j] = (pi_list[i].T @ B @ pi_list[j])[0][0]
+
+    A = (np.random.uniform(0, 1, n**2).reshape(n, n) < P)
+
+    return (A, largest_prob, P)
