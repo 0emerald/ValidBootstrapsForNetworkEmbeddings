@@ -21,6 +21,11 @@ Find bootstraps that work to replicate embeddings well
 A procedure that evaluates how well a bootstrap replicate follows the true underlying distribution of the observation, for the case where only a single observation is made. 
 "A principled method to evaluate the validity of bootstrap replications for graphs (adjacency matrices)"
 (Naturally this is made easier to evaluate with more observations - i.e. if multiple obs, we advise the reader do this)
+* 
+22April2024 update: 
+* the `mixed_membership_bootstraps.ipynb` contains stuff on MM SBM and DCSBM. Also see functions for testing with bootstraps in the `functions_for_bootstraps.py` file, via our kNN method. 
+* Example notebooks for real data, saved under sensible names too.
+* 
 
 ## To do
 
