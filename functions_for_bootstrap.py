@@ -123,43 +123,64 @@ def edgelist_jackknife(A, B, num_times):
 
 
 
-# NOTE this is garbage. it don't work
-# @nb.njit
-# def bootstrap_testing_per_node(ya_node_set, normal_samples_for_each_node, n_sim=200):
-#     # Hypothesis test to check whether the observed difference is significant with respect to the
-#     #  bootstrap samples
+"""This is needed for the test_bootstrap function"""
+@nb.njit
+def P_est_from_A_obs(n, A_obs, n_neighbors, indices):
+    P_est = np.zeros((n, n))
+    for i in range(n):
+        idx = indices[i]
+        A_i = (1/n_neighbors) * np.sum(A_obs[:, idx], axis=1)
+        P_est[:, i] = A_i
+    return P_est
 
-#     assert len(ya_node_set.shape) == 3
+"""This takes in an adjacency matrix,
+embeds the matrix via spectral embedding,
+finds the k-nearest neighbors of each node, 
+uses the A values of the k nearest neighbors to estimate the P matrix.
+You are your own first neighbour, so k=1 just gives P_est as A that is input. """
+def test_bootstrap(A, d, dc=False):
+    n = A.shape[0]
+    A_obs = A.copy()
 
-#     n_node_set = ya_node_set.shape[1]
+    # Embed the graphs -------------------------------  
 
-#     # Written slowly so I can jit
-#     displacement = ya_node_set[0] - ya_node_set[1]
-#     observed = np.array([np.linalg.norm(displacement[i]) for i in range(n_node_set)])
+    if dc:
+        yhat = UASE([A], d=d+1, flat=True)
+        tol=1e-12
+        norms = np.linalg.norm(yhat, axis=1)
+        idx = np.where(norms > tol)
+        yhat_dc = yhat.copy()
+        yhat_dc[idx] = yhat_dc[idx] / norms[idx][:, None]
+        yhat = yhat_dc
+            
+    else:
+        yhat = UASE([A], d=d, flat=True)
 
-#     # TODO: don't forget bonferroni correction (is there a +1 or no??)
-#     p_hat_per_node = np.zeros((n_node_set,))
-#     for i in range(n_node_set):
-#         tests_for_node = np.zeros((n_sim + 1,))
-#         tests_for_node[0] = observed[i]
-#         tests_for_node[1:] = normal_samples_for_each_node[i]
+    # run a k-NN on the embedding yhat
+    n_neighbors = 5
 
-#         # for sim in range(n_sim):
-#         # Draw a bunch of samples from a normal dist and use a hypothesis test to check if the
-#         #  observed difference is significant
-#         # This is because we expect the difference between the two embeddings to be normally
-#         #  distributed with mean 0 and variance 4 sigma_hat
+    # Here we use Minkowski distance
+    from sklearn.neighbors import NearestNeighbors
+    nbrs = NearestNeighbors(n_neighbors=n_neighbors, algorithm='ball_tree').fit(yhat)
+    distances, indices = nbrs.kneighbors(yhat)
 
-#         # 4 here because we do (Y1 - Ytrue) + (Y0 - Ytrue) (4 combos)
-#         # normal_sample = np.random.multivariate_normal(
-#         #     np.zeros(d), 4 * (sigma_hats[i]), size=1
-#         # ).flatten()
-#         # tests_for_node[sim] = np.linalg.norm(normal_sample)
+    # Estimate the P matrix -------------------------------
+    P_est = P_est_from_A_obs(n, A_obs, n_neighbors=n_neighbors, indices=indices)
 
-#         p_hat = 1 / (n_sim + 1) * np.sum(tests_for_node >= observed[i])
+    # Bootstrap -----------------------------------------
+    B = 100
+    p_vals = []
+    A_boots = []
+    for i in range(B):
+        A_est = make_inhomogeneous_rg(P_est)
 
-#         # Apply bonferroni correction
-#         p_hat_per_node[i] = p_hat
-#         # p_hat_per_node[i] = p_hat / n_node_set
+        if dc:
+            # Undo degree correction
+            A_est = A_est * np.outer(norms, norms)
 
-#     return p_hat_per_node
+        yhat_est = UASE([A_obs,A_est], d=d)
+        p_val = test_temporal_displacement_two_times(yhat_est, n)
+        p_vals.append(p_val)
+        A_boots.append(A_est)
+
+    return p_vals, A_boots
