@@ -25,7 +25,16 @@ A procedure that evaluates how well a bootstrap replicate follows the true under
 22April2024 update: 
 * the `mixed_membership_bootstraps.ipynb` contains stuff on MM SBM and DCSBM. Also see functions for testing with bootstraps in the `functions_for_bootstraps.py` file, via our kNN method. 
 * Example notebooks for real data, saved under sensible names too.
-* 
+
+## new to do 
+- [ ] fix plots and terminology
+- [ ] explain the p-value testing procedure
+- [ ] DON'T HARD CODE B INTO TEST_BOOTSTRAP, FIX THIS IN ALL THE CODE THAT USES IT WHILE YOU'RE THERE
+- [ ] SHOULD TEST_BOOTSTRAP USE EUCLIDEAN OR MINKOWSKI DISTANCE, IF IT USES THE LATTER, WHAT IS THE VALUE OF p? COS p=2 IS EUCLIDEAN
+- [ ] UPDATE TEST_BOOTSTRAP TO TAKE IN A WEIGHTED GRAPH AS WELL, PERHAPS A ARGUEMNT TO FUCNTION. tHEN NEED TO MAKE A WEIGHTED_INHOMOGENOUS_RG FUNCTION - OR SOMETHING TO THIS NAME, BUT A MODEL THAT WORKS FOR A WEIGHTED GRAPH
+- [ ] This is why test_bootstrap doesn't work for hte trade data that is weighted
+- [ ] CODE UP A WEIGHTED THING
+
 
 ## To do
 
