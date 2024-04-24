@@ -31,7 +31,8 @@ A procedure that evaluates how well a bootstrap replicate follows the true under
 - [ ] explain the p-value testing procedure
 - [x] DON'T HARD CODE B INTO TEST_BOOTSTRAP, FIX THIS IN ALL THE CODE THAT USES IT WHILE YOU'RE THERE
 - [x] also fixed that n_neighbors had been hard coded into the test_bootstrap function
-- [ ] SHOULD TEST_BOOTSTRAP USE EUCLIDEAN OR MINKOWSKI DISTANCE, IF IT USES THE LATTER, WHAT IS THE VALUE OF p? COS p=2 IS EUCLIDEAN
+- [x] SHOULD TEST_BOOTSTRAP USE EUCLIDEAN OR MINKOWSKI DISTANCE, IF IT USES THE LATTER, WHAT IS THE VALUE OF p? COS p=2 IS EUCLIDEAN.
+- [ ] ^^ Answer: the default for the function is metric='minkowski', p=2, which is Eucliean, but I hard coded these choices in so we are in fact using Euclidean.
 - [ ] UPDATE TEST_BOOTSTRAP TO TAKE IN A WEIGHTED GRAPH AS WELL, PERHAPS A ARGUEMNT TO FUCNTION. tHEN NEED TO MAKE A WEIGHTED_INHOMOGENOUS_RG FUNCTION - OR SOMETHING TO THIS NAME, BUT A MODEL THAT WORKS FOR A WEIGHTED GRAPH
 - [ ] This is why test_bootstrap doesn't work for hte trade data that is weighted
 - [ ] CODE UP A WEIGHTED THING
