@@ -185,8 +185,28 @@ def test_bootstrap(A, d, B=100, n_neighbors=5, dc=False):
     return p_vals, A_boots
 
 
+def check_matrix_range(matrix):
+    min_val = np.min(matrix)
+    max_val = np.max(matrix)
+    
+    if min_val < 0 or max_val > 1:
+        raise ValueError("Matrix values must be within the range [0, 1].")
+    else:
+        print("Matrix values are within the range [0, 1].")
+
+def multiply_with_weights(A, w1, w2):
+    # Reshape w1 and w2 to have dimensions (n, 1)
+    w1_reshaped = w1[:, np.newaxis]  # shape (n, 1)
+    w2_reshaped = w2[np.newaxis, :]  # shape (1, n)
+    
+    # Perform element-wise multiplication
+    M = w1_reshaped * w2_reshaped * A
+    
+    return M
+
+
 """Should work for estimating bootstraps of A that can be weighted and directed"""
-def test_bootstrap_W_D(A, d, B=100, n_neighbors=5):
+def test_bootstrap_universal(A, d, B=100, n_neighbors=5):
     n = A.shape[0]
     A_obs = A.copy()
 
@@ -200,19 +220,32 @@ def test_bootstrap_W_D(A, d, B=100, n_neighbors=5):
     nbrs = NearestNeighbors(n_neighbors=n_neighbors, algorithm='ball_tree', metric='minkowski', p=2).fit(yhat)
     distances, indices = nbrs.kneighbors(yhat)
 
-    # Estimate the P matrix -------------------------------
+    # Estimate the "weighted" P matrix (idk how you'd sample from this) -------------------------------
     P_est = P_est_from_A_obs(n, A_obs, n_neighbors=n_neighbors, indices=indices)
+    
+    # Calculate the in and out weight vectors of A_obs -------------------------------  
+    out_weights = np.sum(A_obs, axis=1) #row sum
+    in_weights = np.sum(A_obs, axis=0) #column sum
+
+    # Adjusted P_est matrix ( not sure if this will be in [0,1]) -------------------------------
+    P_est_adj = np.zeros((n,n))
+    for i in range(n):
+        for j in range(n):
+            if (out_weights[i]*in_weights[j]) == 0:
+                P_est_adj[i,j] = 0
+            else:
+                P_est_adj[i,j] = (1/(out_weights[i]*in_weights[j])) * P_est[i,j]
+
+    # Check matrix range
+    check_matrix_range(P_est_adj)
 
     # Bootstrap -----------------------------------------
     # B = 100
     p_vals = []
     A_boots = []
     for i in range(B):
-        A_est = make_inhomogeneous_rg(P_est)
-
-        if dc:
-            # Undo degree correction
-            A_est = A_est * np.outer(norms, norms)
+        A_est_adj = make_inhomogeneous_rg(P_est_adj)
+        A_est = multiply_with_weights(out_weights, in_weights, A_est_adj)[0]
 
         yhat_est = UASE([A_obs,A_est], d=d)
         p_val = test_temporal_displacement_two_times(yhat_est, n)
@@ -220,3 +253,5 @@ def test_bootstrap_W_D(A, d, B=100, n_neighbors=5):
         A_boots.append(A_est)
 
     return p_vals, A_boots
+
+
