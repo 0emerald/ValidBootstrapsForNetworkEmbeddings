@@ -462,7 +462,7 @@ def sbm_from_B(n, Bs, return_p=False):
         return (As, tau, Ps)
 
 
-@nb.njit()
+#@nb.njit()
 def make_MMSBM(n, K):
 
     # Generate B matrix - this has 0.2 for all off-diagonal entries
@@ -484,11 +484,13 @@ def make_MMSBM(n, K):
     P = np.zeros((n, n))
     for i in range(n):
         for j in range(n):
-            # this really should be pi[i] and pi[j] but since pi_i = pi_j for all i,j we don't bother
-            P[i,j] = (pi_list[i].T @ B @ pi_list[j])[0][0]
+            z_ij = np.random.multinomial(1, pi_list[i].flatten())#.tolist())
+            z_ji = np.random.multinomial(1, pi_list[j].flatten())#.tolist())
+
+            P[i,j] = z_ij @ B @ z_ji.T
 
     A = (np.random.uniform(0, 1, n**2).reshape(n, n) < P)
 
-    return (A, largest_prob, P)
+    return (A, largest_prob, P, B)
 
 
