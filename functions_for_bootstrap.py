@@ -5,7 +5,8 @@ from experiment_setup import *
 from embedding_functions import *
 import gc
 from tqdm import tqdm
-import numba as nb
+import numba as nb#
+import random
 
 
 def plot_power(p_hat_list, plot=True):
@@ -137,24 +138,17 @@ def P_est_from_A_obs(n, A_obs, n_neighbors, indices):
 embeds the matrix via spectral embedding,
 finds the k-nearest neighbors of each node, 
 uses the A values of the k nearest neighbors to estimate the P matrix.
-You are your own first neighbour, so k=1 just gives P_est as A that is input. """
-def test_bootstrap(A, d, B=100, n_neighbors=5, dc=False):
+You are your own first neighbour, so k=1 just gives P_est as A that is input. 
+It doesn't do a test!!!!!
+It just gives you B bootstrapped matrices for a given observed matrix!
+"""
+def test_bootstrap(A, d, B=100, n_neighbors=5):
     n = A.shape[0]
     A_obs = A.copy()
 
     # Embed the graphs -------------------------------  
 
-    if dc:
-        yhat = UASE([A], d=d+1, flat=True)
-        tol=1e-12
-        norms = np.linalg.norm(yhat, axis=1)
-        idx = np.where(norms > tol)
-        yhat_dc = yhat.copy()
-        yhat_dc[idx] = yhat_dc[idx] / norms[idx][:, None]
-        yhat = yhat_dc
-            
-    else:
-        yhat = UASE([A], d=d, flat=True)
+    yhat = UASE([A], d=d, flat=True)
 
     # run a k-NN on the embedding yhat
     # Here we use Minkowski distance, with p=2 (these are the defaults),
@@ -168,14 +162,11 @@ def test_bootstrap(A, d, B=100, n_neighbors=5, dc=False):
 
     # Bootstrap -----------------------------------------
     # B = 100
+    random.seed(10)
     p_vals = []
     A_boots = []
     for i in range(B):
         A_est = make_inhomogeneous_rg(P_est)
-
-        if dc:
-            # Undo degree correction
-            A_est = A_est * np.outer(norms, norms)
 
         yhat_est = UASE([A_obs,A_est], d=d)
         p_val = test_temporal_displacement_two_times(yhat_est, n)
@@ -183,6 +174,35 @@ def test_bootstrap(A, d, B=100, n_neighbors=5, dc=False):
         A_boots.append(A_est)
 
     return p_vals, A_boots
+    
+def create_single_kNN_bootstrap(A, d, Q=1000, n_neighbors=5):
+	n = A.shape[0]
+	A_obs = A.copy()
+
+	# Embed the graphs -------------------------------  
+
+	yhat = UASE([A], d=d, flat=True)
+
+	# run a k-NN on the embedding yhat
+	# Here we use Minkowski distance, with p=2 (these are the defaults),
+	# which corresponds to Euclidean distance
+	from sklearn.neighbors import NearestNeighbors
+	nbrs = NearestNeighbors(n_neighbors=n_neighbors, algorithm='ball_tree', metric='minkowski', p=2).fit(yhat)
+	distances, indices = nbrs.kneighbors(yhat)
+
+	# Estimate the P matrix -------------------------------
+	P_est = P_est_from_A_obs(n, A_obs, n_neighbors=n_neighbors, indices=indices)
+
+	# Bootstrap -----------------------------------------
+	A_est = make_inhomogeneous_rg(P_est)
+
+	# embed the observed and bootstrapped matrices together --------------------------------
+	yhat_est = UASE([A_obs,A_est], d=d)
+
+	# do a test between the obs and the bootstrap, get a p-value ---------------------------------
+	p_val = test_temporal_displacement_two_times(yhat_est, n, n_sim=Q)
+
+	return p_val, A_est
 
 
 def check_matrix_range(matrix):

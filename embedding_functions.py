@@ -8,6 +8,7 @@ import plotly.express as px
 import nodevectors
 import seaborn as sns
 import matplotlib.pyplot as plt
+import random
 import numba as nb
 
 # from src.libne.DynWalks import DynWalks
