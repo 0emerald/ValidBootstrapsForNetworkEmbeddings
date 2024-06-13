@@ -203,6 +203,40 @@ def create_single_kNN_bootstrap(A, d, Q=1000, n_neighbors=5):
 	p_val = test_temporal_displacement_two_times(yhat_est, n, n_sim=Q)
 
 	return p_val, A_est
+	
+	
+def create_single_kNN_bootstrap_force0diag(A, d, Q=1000, n_neighbors=5):
+	n = A.shape[0]
+	A_obs = A.copy()
+
+	# Embed the graphs -------------------------------  
+
+	yhat = UASE([A], d=d, flat=True)
+
+	# run a k-NN on the embedding yhat
+	# Here we use Minkowski distance, with p=2 (these are the defaults),
+	# which corresponds to Euclidean distance
+	from sklearn.neighbors import NearestNeighbors
+	nbrs = NearestNeighbors(n_neighbors=n_neighbors, algorithm='ball_tree', metric='minkowski', p=2).fit(yhat)
+	distances, indices = nbrs.kneighbors(yhat)
+
+	# Estimate the P matrix -------------------------------
+	P_est = P_est_from_A_obs(n, A_obs, n_neighbors=n_neighbors, indices=indices)
+
+	# Bootstrap -----------------------------------------
+	A_est = make_inhomogeneous_rg(P_est)
+	
+	# Force diagonal to be 0 --------------------------------
+	np.fill_diagonal(A_est, 0)
+
+	# embed the observed and bootstrapped matrices together --------------------------------
+	yhat_est = UASE([A_obs,A_est], d=d)
+
+	# do a test between the obs and the bootstrap, get a p-value ---------------------------------
+	p_val = test_temporal_displacement_two_times(yhat_est, n, n_sim=Q)
+
+	return p_val, A_est
+
 
 
 def check_matrix_range(matrix):
