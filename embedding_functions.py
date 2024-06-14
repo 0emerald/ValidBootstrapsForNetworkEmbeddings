@@ -1,4 +1,4 @@
-# import networkx as nx
+import networkx as nx
 from scipy.spatial import distance
 from scipy import stats
 import numpy as np
@@ -12,7 +12,6 @@ import random
 import numba as nb
 
 # from src.libne.DynWalks import DynWalks
-import networkx as nx
 
 
 # def GloDyNE(As, d, limit=0.1, num_walks=20, walklen=30, window=10, scheme=4, sparse_matrix=False):
