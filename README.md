@@ -53,7 +53,7 @@ A procedure that evaluates how well a bootstrap replicate follows the true under
 -   [ ] (What cool things are people using bootstraps for in the literature - this is a lit review task. )
 -   [ ] Some citations to tell the reader how to pick $k$, also should tell them how to choose $Q$ (Q<n^2).
 -   [ ] stuff about picking k for the examples we have - this is the number of nearest neighbours
--   [ ] variance estimation for the simulated example (4 comm sbm).
+-   [x] variance estimation for the simulated example (4 comm sbm).
 -   [1/2] Add in the stuff about the non SBM weighted poisson - talk to Dan about this - doesn't really work
 -   [ ] Real world data examples (we need a network where we have another "real" same distribution network to compare it to -- flight data)
 -   [ ] Reword the paper
