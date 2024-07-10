@@ -196,6 +196,38 @@ def edgelist_sample_with_replacement(A):
     return(A_new)
     
     
+def edgelist_sample_with_replacement_addRandomEdges(A):
+    """Actually just samples with replacement. As a binary setting, any edge selected more than once will be set to 1
+    Random edges will be populated so that the observed and the bootstrapped matrix have the same number of edges
+    """
+    number_edges = np.count_nonzero(A)
+    # find the edge locations
+    edges = np.transpose(np.nonzero(A))
+    # sample the edges with replacement
+    edge_idx = random.choices(range(0,number_edges), k=number_edges)
+    # remove duplicates
+    edge_idx = list(set(edge_idx))
+    # create an array from edges with the sampled indices
+    edge_sample = edges[edge_idx]
+    n = A.shape[0]
+    A_new = np.zeros((n,n))
+    # populate A_new with a 1 where edge_sample is the index
+    for e in range(len(edge_sample)):
+        edge_id = edge_sample[e]
+        A_new[edge_id[0], edge_id[1]] = 1
+        
+    # add in random edges
+    num_to_add = number_edges - len(edge_sample)
+    while num_to_add > 0:
+        i, j = np.random.randint(low=0, high=n, size=2)
+        # check not in edges
+        if A_new[i, j] == 0:
+            A_new[i, j] = 1
+            # if not in edge, add to edge_sample, else repeat loop
+            num_to_add -= 1
+    
+    return A_new
+    
     
 
 
