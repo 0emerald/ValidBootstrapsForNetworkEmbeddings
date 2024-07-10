@@ -1,4 +1,4 @@
-import networkx as nx
+# import networkx as nx
 from scipy.spatial import distance
 from scipy import stats
 import numpy as np
@@ -12,6 +12,7 @@ import random
 import numba as nb
 
 # from src.libne.DynWalks import DynWalks
+import networkx as nx
 
 
 # def GloDyNE(As, d, limit=0.1, num_walks=20, walklen=30, window=10, scheme=4, sparse_matrix=False):
@@ -115,6 +116,35 @@ def single_spectral(A, d, seed=None):
     XA = UA @ np.diag(np.sqrt(SA))
     return XA
 
+def single_spectral_X(A, d, seed=None):
+    if seed is not None:
+        UA, SA, VAt = sparse.linalg.svds(A, d, random_state=seed)
+    else:
+        UA, SA, VAt = sparse.linalg.svds(A, d)
+
+    VA = VAt.T
+    idx = SA.argsort()[::-1]
+    VA = VA[:, idx]
+    UA = UA[:, idx]
+    SA = SA[idx]
+    # Output the left spectral embedding
+    XA = UA @ np.diag(np.sqrt(SA))
+    return XA
+    
+def single_spectral_Y(A, d, seed=None):
+    if seed is not None:
+        UA, SA, VAt = sparse.linalg.svds(A, d, random_state=seed)
+    else:
+        UA, SA, VAt = sparse.linalg.svds(A, d)
+
+    VA = VAt.T
+    idx = SA.argsort()[::-1]
+    VA = VA[:, idx]
+    UA = UA[:, idx]
+    SA = SA[idx]
+    # Output the right spectral embedding
+    YA = VA @ np.diag(np.sqrt(SA))
+    return YA
 
 def sparse_stack(As):
     A = As[0]
@@ -563,6 +593,7 @@ def embed(
     regulariser=0,
     p=1,
     q=1,
+    sparse_matrix=False,
     two_hop=False,
     verbose=False,
     num_walks=20,
@@ -575,7 +606,7 @@ def embed(
     elif method.upper() == "SSE PROCRUSTES":
         YA = SSE(As, d, procrustes=True)
     elif method.upper() == "UASE":
-        YA = UASE(As, d)
+        YA = UASE(As, d, sparse_matrix=sparse_matrix)
     elif method.upper() == "OMNI":
         YA = OMNI(As, d)
     elif method.upper() == "ULSE":
@@ -1403,3 +1434,4 @@ def general_unfolded_matrix(As, sparse_matrix=False):
         DA[n:, 0:n] = A.T
 
     return DA
+

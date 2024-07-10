@@ -418,20 +418,43 @@ def make_iid_close_power(n, T=2, max_exp_deg=6, beta=2.5, change_prob=0.9, w_par
 
 @nb.njit()
 def make_inhomogeneous_rg(P):
+    """
+    Make an inhomogenous random graph from some probability matrix P
+
+    Use this function is your A is going to be dense
+    """
     n = P.shape[0]
-    A = np.zeros((n, n), dtype=np.float64)
+    A = np.zeros((n, n), dtype=np.float32)
     for i in range(n):
         for j in range(n):
             A[i, j] = np.random.uniform(0, 1) < P[i, j]
     return A
 
 
-def make_inhomogeneous_rg_sparse(P):
+@nb.njit()
+def make_inhomogeneous_rg_csr_parts(P):
     n = P.shape[0]
-    random_values = np.random.uniform(0, 1, (n, n))
-    A = sparse.csr_matrix((random_values < P).astype(np.float64))
-    del random_values
-    return A
+    A_data = []
+    A_rows = []
+    A_cols = []
+    for i in range(n):
+        for j in range(n):
+            if P[i, j] != 0 and np.random.uniform(0, 1) < P[i, j]:
+                A_data.append(True)
+                A_rows.append(i)
+                A_cols.append(j)
+    return A_data, A_rows, A_cols
+
+
+def make_inhomogeneous_rg_sparse(P):
+    """
+    Make an inhomogenous random graph from some probability matrix P
+
+    Use this function is your A is going to be sparse
+    """
+    n = P.shape[0]
+    A_data, A_rows, A_cols = make_inhomogeneous_rg_csr_parts(P)
+    return sparse.csr_matrix((A_data, (A_rows, A_cols)), shape=(n, n), dtype=np.float32)
 
 
 def sbm_from_B(n, Bs, return_p=False):
@@ -462,7 +485,7 @@ def sbm_from_B(n, Bs, return_p=False):
         return (As, tau, Ps)
 
 
-#@nb.njit()
+# @nb.njit()
 def make_MMSBM(n, K):
 
     # Generate B matrix - this has 0.2 for all off-diagonal entries
@@ -484,13 +507,11 @@ def make_MMSBM(n, K):
     P = np.zeros((n, n))
     for i in range(n):
         for j in range(n):
-            z_ij = np.random.multinomial(1, pi_list[i].flatten())#.tolist())
-            z_ji = np.random.multinomial(1, pi_list[j].flatten())#.tolist())
+            z_ij = np.random.multinomial(1, pi_list[i].flatten())  # .tolist())
+            z_ji = np.random.multinomial(1, pi_list[j].flatten())  # .tolist())
 
-            P[i,j] = z_ij @ B @ z_ji.T
+            P[i, j] = z_ij @ B @ z_ji.T
 
-    A = (np.random.uniform(0, 1, n**2).reshape(n, n) < P)
+    A = np.random.uniform(0, 1, n**2).reshape(n, n) < P
 
     return (A, largest_prob, P, B)
-
-
