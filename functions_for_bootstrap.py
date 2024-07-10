@@ -97,11 +97,12 @@ def create_single_parametric_bootstrap_cropPto0_1range(A, d, Q=1000):
     p_val: (float) p-value from the exch test between the obs and the bootstrapped matrix
     """
 
-    # Compute the spectral embedding of A
-    X_hat = single_spectral(A, d)
+    # Compute the left and right spectral embeddings of A
+    X_hat = single_spectral_X(A, d)  # left
+    Y_hat = single_spectral_Y(A, d)  # right
 
     # Compute the estimated probability matrix
-    P_hat = X_hat @ X_hat.T
+    P_hat = X_hat @ Y_hat.T
 
     # Check if P_hat is a valid probability matrix
     if np.min(P_hat) < 0 or np.max(P_hat) > 1:
