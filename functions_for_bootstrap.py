@@ -127,6 +127,87 @@ def create_single_parametric_bootstrap_cropPto0_1range(A, d, Q=1000):
     return p_val, A_star[0]
         
         
+def create_single_XXT_bootstrap_cropPto0_1range(A, d, Q=1000):
+    """
+    Generates a single bootstrapped adjacency matrix from a single adjacency matrix A.
+
+    input:
+    A: (numpy array (n, n)) adjacency matrix
+    d: (int) embedding dimension. In theory the rank of the noise-free A matrix.
+    Q: (int) number of simulations in the paired exchangeability test.
+
+    output:
+    A_star: (numpy array (n, n)) bootstrapped adjacency matrix
+    p_val: (float) p-value from the exch test between the obs and the bootstrapped matrix
+    """
+
+    # Compute ONLY the left spectral embeddings of A
+    X_hat = single_spectral_X(A, d)  # left
+
+    # Compute the estimated probability matrix
+    P_hat = X_hat @ X_hat.T
+
+    # Check if P_hat is a valid probability matrix
+    if np.min(P_hat) < 0 or np.max(P_hat) > 1:
+        warnings.warn("P_hat contains values outside of [0,1]. The values outside this range will be clipped to lie in the range.")
+        
+    # Clip values in P_hat to be between 0 and 1
+    P_hat = np.clip(P_hat, 0, 1)
+    
+    # Check the values in P_hat have been clipped 
+    if np.min(P_hat) < 0 or np.max(P_hat) > 1:
+        warnings.warn("P_hat contains values outside of [0,1] after the clipping code, please check the function.")
+
+    A_star = np.array([make_inhomogeneous_rg(P_hat)])
+
+    # embed the observed and bootstrapped matrix together
+    yhat_est = UASE([A, A_star[0]], d=d)
+    # do a test between the obs and the bootstrap, get a p-value ---------------------------------
+    p_val = test_temporal_displacement_two_times(yhat_est, n=A.shape[0], n_sim=Q) 
+
+    return p_val, A_star[0]
+        
+        
+def create_single_YYT_bootstrap_cropPto0_1range(A, d, Q=1000):
+    """
+    Generates a single bootstrapped adjacency matrix from a single adjacency matrix A.
+
+    input:
+    A: (numpy array (n, n)) adjacency matrix
+    d: (int) embedding dimension. In theory the rank of the noise-free A matrix.
+    Q: (int) number of simulations in the paired exchangeability test.
+
+    output:
+    A_star: (numpy array (n, n)) bootstrapped adjacency matrix
+    p_val: (float) p-value from the exch test between the obs and the bootstrapped matrix
+    """
+
+    # Compute ONLY the left spectral embeddings of A
+    Y_hat = single_spectral_Y(A, d)  # right
+
+    # Compute the estimated probability matrix
+    P_hat = Y_hat @ Y_hat.T
+
+    # Check if P_hat is a valid probability matrix
+    if np.min(P_hat) < 0 or np.max(P_hat) > 1:
+        warnings.warn("P_hat contains values outside of [0,1]. The values outside this range will be clipped to lie in the range.")
+        
+    # Clip values in P_hat to be between 0 and 1
+    P_hat = np.clip(P_hat, 0, 1)
+    
+    # Check the values in P_hat have been clipped 
+    if np.min(P_hat) < 0 or np.max(P_hat) > 1:
+        warnings.warn("P_hat contains values outside of [0,1] after the clipping code, please check the function.")
+
+    A_star = np.array([make_inhomogeneous_rg(P_hat)])
+
+    # embed the observed and bootstrapped matrix together
+    yhat_est = UASE([A, A_star[0]], d=d)
+    # do a test between the obs and the bootstrap, get a p-value ---------------------------------
+    p_val = test_temporal_displacement_two_times(yhat_est, n=A.shape[0], n_sim=Q) 
+
+    return p_val, A_star[0]
+        
         
 
 def row_sample_with_replacement(A, B):
