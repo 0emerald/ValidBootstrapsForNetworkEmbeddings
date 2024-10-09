@@ -99,10 +99,10 @@ def create_single_parametric_bootstrap_cropPto0_1range(A, d, Q=1000):
 
     # Compute the left and right spectral embeddings of A
     X_hat = single_spectral_X(A, d)  # left
-    Y_hat = single_spectral_Y(A, d)  # right
+#    Y_hat = single_spectral_Y(A, d)  # right
 
     # Compute the estimated probability matrix
-    P_hat = X_hat @ Y_hat.T
+    P_hat = X_hat @ X_hat.T
 
     # Check if P_hat is a valid probability matrix
     if np.min(P_hat) < 0 or np.max(P_hat) > 1:
@@ -498,6 +498,37 @@ def create_single_kNN_bootstrap(A, d, Q=1000, n_neighbors=5):
 
     return p_val, A_est
 
+def create_single_kNN_n2v_bootstrap(A, d, Q=1000, n_neighbors=5):
+    n = A.shape[0]
+    A_obs = A.copy()
+
+    # Embed the graphs -------------------------------
+
+    yhat = unfolded_n2v([A], d=d, flat=True)
+
+    # run a k-NN on the embedding yhat
+    # Here we use Minkowski distance, with p=2 (these are the defaults),
+    # which corresponds to Euclidean distance
+    from sklearn.neighbors import NearestNeighbors
+
+    nbrs = NearestNeighbors(
+        n_neighbors=n_neighbors, algorithm="ball_tree", metric="minkowski", p=2
+    ).fit(yhat)
+    distances, indices = nbrs.kneighbors(yhat)
+
+    # Estimate the P matrix -------------------------------
+    P_est = P_est_from_A_obs(n, A_obs, n_neighbors=n_neighbors, indices=indices)
+
+    # Bootstrap -----------------------------------------
+    A_est = make_inhomogeneous_rg(P_est)
+
+    # embed the observed and bootstrapped matrices together --------------------------------
+    yhat_est = UASE([A_obs, A_est], d=d)
+
+    # do a test between the obs and the bootstrap, get a p-value ---------------------------------
+    p_val = test_temporal_displacement_two_times(yhat_est, n, n_sim=Q)
+
+    return p_val, A_est
 
 def check_matrix_range(matrix):
     min_val = np.min(matrix)
