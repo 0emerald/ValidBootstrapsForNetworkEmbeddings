@@ -17,7 +17,7 @@ int_list_type = ListType(types.int32)
 
 
 def plot_power(p_hat_list, plot=True):
-    # Plot the ROC curve
+    """Plot the QQ-plot curve"""
     roc = []
     alphas = []
     for alpha in np.linspace(0, 1, 100):
@@ -37,7 +37,473 @@ def plot_power(p_hat_list, plot=True):
         plt.show()
 
     return power
+    
+    
+    
+def compute_roc_and_areas(p_hat_list, significance_level=0.05):
+    """Plot the QQ-plot and compute the area between the x=y line and the curve, the 'Bootstrap Validity Score'"""
+    roc = []
+    alphas = []
 
+    for alpha in np.linspace(0, 1, 100):
+        alphas.append(alpha)
+        num_below_alpha = sum(p_hat_list < alpha)
+        roc_point = num_below_alpha / len(p_hat_list)
+        roc.append(roc_point)
+
+    # Get the power at the significance level
+    power_idx = alphas.index(min(alphas, key=lambda x: abs(x - significance_level)))
+    power = roc[power_idx]
+
+    # Calculate the area between ROC and y=x line
+    def compute_area_above_below_curve(x, y):
+        area_above = 0.0
+        area_below = 0.0
+
+        for i in range(1, len(x)):
+            x0, x1 = x[i - 1], x[i]
+            y0, y1 = y[i - 1], y[i]
+            line0, line1 = x0, x1  # Since line y = x
+
+            if y1 == y0:  # Vertical segment
+                if y0 > x0:
+                    area_above += (y0 - x0) * (x1 - x0)
+                else:
+                    area_below += (x0 - y0) * (x1 - x0)
+                continue
+
+            # Find intersection with y = x
+            if (y0 >= x0 and y1 >= x1) or (y0 <= x0 and y1 <= x1):
+                if y0 >= x0 and y1 >= x1:
+                    area_above += 0.5 * (y0 + y1 - x0 - x1) * (x1 - x0)
+                else:
+                    area_below += 0.5 * (x0 + x1 - y0 - y1) * (x1 - x0)
+            else:
+                x_intersect = x0 + (x0 - y0) * (x1 - x0) / (y1 - y0)
+                if y0 < x0:
+                    area_below += 0.5 * (x0 - y0) * (x_intersect - x0)
+                    area_above += 0.5 * (y1 - x1) * (x1 - x_intersect)
+                else:
+                    area_above += 0.5 * (y0 - x0) * (x_intersect - x0)
+                    area_below += 0.5 * (x1 - y1) * (x1 - x_intersect)
+
+        return area_above, area_below
+
+    x = np.linspace(0, 1, 100)
+    roc_interpolated = np.interp(x, alphas, roc)
+
+    # Compute areas
+    area_above, area_below = compute_area_above_below_curve(x, roc_interpolated)
+    total_area = area_above + area_below
+
+    return {
+        "area_above": area_above,
+        "area_below": area_below,
+        "total_area": total_area
+    }
+
+
+def edgelist_sample_with_replacement_addRandomEdges_v2(A):
+    """Samples edges with replacement and ensures that the bootstrapped matrix has the same number of edges.
+    In a binary setting, any edge selected more than once will be set to 1.
+    Random edges will be populated so that the observed and the bootstrapped matrix have the same number of edges.
+    """
+    number_edges = np.count_nonzero(A)
+    # find the edge locations
+    edges = np.transpose(np.nonzero(A))
+    n = A.shape[0]
+    
+    # sample the edges with replacement
+    sampled_edges = edges[random.choices(range(len(edges)), k=number_edges)]
+    
+    # create A_new and set sampled edges to 1
+    A_new = np.zeros((n, n), dtype=int)
+    A_new[sampled_edges[:, 0], sampled_edges[:, 1]] = 1
+    
+    # add in random edges
+    missing_edges = number_edges - np.count_nonzero(A_new)
+    while missing_edges > 0:
+        i, j = np.random.randint(0, n, size=2)
+        if A_new[i, j] == 0:
+            A_new[i, j] = 1
+            missing_edges -= 1
+    
+    return A_new
+    
+    
+    
+def create_single_kNN_bootstrap(A, d, Q=1000, n_neighbors=5):
+    """Create a single ASE-kNN bootstrap, where ASE is into d dimensions, uses Q permutations to find p-val, and k=n_neighbors in kNN"""
+    n = A.shape[0]
+    A_obs = A.copy()
+
+    # Embed the graphs -------------------------------
+
+    yhat = UASE([A], d=d, flat=True)
+
+    # run a k-NN on the embedding yhat
+    # Here we use Minkowski distance, with p=2 (these are the defaults),
+    # which corresponds to Euclidean distance
+    from sklearn.neighbors import NearestNeighbors
+
+    nbrs = NearestNeighbors(
+        n_neighbors=n_neighbors, algorithm="ball_tree", metric="minkowski", p=2
+    ).fit(yhat)
+    distances, indices = nbrs.kneighbors(yhat)
+
+    # Estimate the P matrix -------------------------------
+    P_est = P_est_from_A_obs(n, A_obs, n_neighbors=n_neighbors, indices=indices)
+
+    # Bootstrap -----------------------------------------
+    A_est = make_inhomogeneous_rg(P_est)
+
+    # embed the observed and bootstrapped matrices together --------------------------------
+    yhat_est = UASE([A_obs, A_est], d=d)
+
+    # do a test between the obs and the bootstrap, get a p-value ---------------------------------
+    p_val = test_temporal_displacement_two_times(yhat_est, n, n_sim=Q)
+
+    return p_val, A_est
+    
+    
+    
+def create_single_YYT_bootstrap_cropPto0_1range(A, d, Q=1000):
+    """
+    Generates a single bootstrapped adjacency matrix from a single adjacency matrix A.
+
+    input:
+    A: (numpy array (n, n)) adjacency matrix
+    d: (int) embedding dimension. In theory the rank of the noise-free A matrix.
+    Q: (int) number of simulations in the paired exchangeability test.
+
+    output:
+    A_star: (numpy array (n, n)) bootstrapped adjacency matrix
+    p_val: (float) p-value from the exch test between the obs and the bootstrapped matrix
+    """
+
+    # Compute ONLY the left spectral embeddings of A
+    Y_hat = single_spectral_Y(A, d)  # right
+
+    # Compute the estimated probability matrix
+    P_hat = Y_hat @ Y_hat.T
+
+    # Check if P_hat is a valid probability matrix
+    if np.min(P_hat) < 0 or np.max(P_hat) > 1:
+        warnings.warn("P_hat contains values outside of [0,1]. The values outside this range will be clipped to lie in the range.")
+        
+    # Clip values in P_hat to be between 0 and 1
+    P_hat = np.clip(P_hat, 0, 1)
+    
+    # Check the values in P_hat have been clipped 
+    if np.min(P_hat) < 0 or np.max(P_hat) > 1:
+        warnings.warn("P_hat contains values outside of [0,1] after the clipping code, please check the function.")
+
+    A_star = np.array([make_inhomogeneous_rg(P_hat)])
+
+    # embed the observed and bootstrapped matrix together
+    yhat_est = UASE([A, A_star[0]], d=d)
+    # do a test between the obs and the bootstrap, get a p-value ---------------------------------
+    p_val = test_temporal_displacement_two_times(yhat_est, n=A.shape[0], n_sim=Q) 
+
+    return p_val, A_star[0]
+
+    
+def create_single_XXT_bootstrap_cropPto0_1range(A, d, Q=1000):
+    """
+    Generates a single bootstrapped adjacency matrix from a single adjacency matrix A.
+
+    input:
+    A: (numpy array (n, n)) adjacency matrix
+    d: (int) embedding dimension. In theory the rank of the noise-free A matrix.
+    Q: (int) number of simulations in the paired exchangeability test.
+
+    output:
+    A_star: (numpy array (n, n)) bootstrapped adjacency matrix
+    p_val: (float) p-value from the exch test between the obs and the bootstrapped matrix
+    """
+
+    # Compute ONLY the left spectral embeddings of A
+    X_hat = single_spectral_X(A, d)  # left
+
+    # Compute the estimated probability matrix
+    P_hat = X_hat @ X_hat.T
+
+    # Check if P_hat is a valid probability matrix
+    if np.min(P_hat) < 0 or np.max(P_hat) > 1:
+        warnings.warn("P_hat contains values outside of [0,1]. The values outside this range will be clipped to lie in the range.")
+        
+    # Clip values in P_hat to be between 0 and 1
+    P_hat = np.clip(P_hat, 0, 1)
+    
+    # Check the values in P_hat have been clipped 
+    if np.min(P_hat) < 0 or np.max(P_hat) > 1:
+        warnings.warn("P_hat contains values outside of [0,1] after the clipping code, please check the function.")
+
+    A_star = np.array([make_inhomogeneous_rg(P_hat)])
+
+    # embed the observed and bootstrapped matrix together
+    yhat_est = UASE([A, A_star[0]], d=d)
+    # do a test between the obs and the bootstrap, get a p-value ---------------------------------
+    p_val = test_temporal_displacement_two_times(yhat_est, n=A.shape[0], n_sim=Q) 
+
+    return p_val, A_star[0]
+        
+        
+        
+def edgelist_sample_with_replacement_addRandomEdges(A):
+    """Actually just samples with replacement. As a binary setting, any edge selected more than once will be set to 1
+    Random edges will be populated so that the observed and the bootstrapped matrix have the same number of edges
+    """
+    number_edges = np.count_nonzero(A)
+    # find the edge locations
+    edges = np.transpose(np.nonzero(A))
+    # sample the edges with replacement
+    edge_idx = random.choices(range(0,number_edges), k=number_edges)
+    # remove duplicates
+    edge_idx = list(set(edge_idx))
+    # create an array from edges with the sampled indices
+    edge_sample = edges[edge_idx]
+    n = A.shape[0]
+    A_new = np.zeros((n,n))
+    # populate A_new with a 1 where edge_sample is the index
+    for e in range(len(edge_sample)):
+        edge_id = edge_sample[e]
+        A_new[edge_id[0], edge_id[1]] = 1
+        
+    # add in random edges
+    num_to_add = number_edges - len(edge_sample)
+    while num_to_add > 0:
+        i, j = np.random.randint(low=0, high=n, size=2)
+        # check not in edges
+        if A_new[i, j] == 0:
+            A_new[i, j] = 1
+            # if not in edge, add to edge_sample, else repeat loop
+            num_to_add -= 1
+    
+    return A_new
+    
+    
+def edgelist_sample_with_replacement(A):
+    """Actually just samples with replacement. As a binary setting, any edge selected more than once will be set to 1"""
+    number_edges = np.count_nonzero(A)
+    # find the edge locations
+    edges = np.transpose(np.nonzero(A))
+    # sample the edges with replacement
+    edge_idx = random.choices(range(0,number_edges), k=number_edges)
+    # remove duplicates
+    edge_idx = list(set(edge_idx))
+    # create an array from edges with the sampled indices
+    edge_sample = edges[edge_idx]
+    n = A.shape[0]
+    A_new = np.zeros((n,n))
+    # populate A_new with a 1 where edge_sample is the index
+    for e in range(len(edge_sample)):
+        edge_id = edge_sample[e]
+        A_new[edge_id[0], edge_id[1]] = 1
+    
+    return(A_new)       
+        
+    
+"""This is needed for the test_bootstrap function"""
+@nb.njit
+def P_est_from_A_obs(n, A_obs, n_neighbors, indices):
+    P_est = np.zeros((n, n))
+    for i in range(n):
+        idx = indices[i]
+        A_i = (1 / n_neighbors) * np.sum(A_obs[:, idx], axis=1)
+        P_est[:, i] = A_i
+    return P_est
+    
+    
+def row_sample_with_replacement(A, B):
+    """
+    Implemented for just a single bootstrap sample for now
+
+    input:
+    A: (numpy array (n, n)) adjacency matrix
+    B: (int) number of bootstrap samples to take
+
+    output:
+    A_star: (numpy array (B, n, n)) bootstrapped adjacency matrices
+    """
+
+    # this is the number of nodes
+    n = A.shape[0]
+
+    # initialize an array to store the bootstrapped adjacency matrices
+    A_row_jumbles = np.zeros((B, n, n))
+
+    for i in range(B):
+        # for each bootstrap sample, select which rows to put in the new matrix
+        idx = np.random.choice(n, size=n, replace=True)
+        for j in range(n):
+            # put the rows in the new matrix
+            A_row_jumbles[i][j, :] += A[idx[j], :]
+
+    return A_row_jumbles   
+    
+    
+@nb.njit
+def P_est_from_edge_list(n, node_to_edges, n_neighbors, indices):
+    P_est = np.zeros((n, n))
+    for i in range(n):
+        idx_set = set(indices[i])
+        A_i = np.zeros(n)
+        for node in idx_set:
+            for edge in node_to_edges[node]:
+                A_i[edge] += 1
+        A_i = (1 / n_neighbors) * A_i
+        P_est[:, i] = A_i
+    return P_est
+    
+    
+def create_single_kNN_prone_bootstrap(A, d, Q=1000, n_neighbors=5):
+    n = A.shape[0]
+    A_obs = A.copy()
+    # Embed the graphs -------------------------------
+    yhat = unfolded_prone(A, d=d, flat=True)
+    # run a k-NN on the embedding yhat
+    # Here we use Minkowski distance, with p=2 (these are the defaults),
+    # which corresponds to Euclidean distance
+    from sklearn.neighbors import NearestNeighbors
+    nbrs = NearestNeighbors(
+        n_neighbors=n_neighbors, algorithm="ball_tree", metric="minkowski", p=2
+    ).fit(yhat)
+    distances, indices = nbrs.kneighbors(yhat)
+    # Estimate the P matrix -------------------------------
+    P_est = P_est_from_A_obs(n, A_obs, n_neighbors=n_neighbors, indices=indices)
+    # Bootstrap -----------------------------------------
+    A_est = make_inhomogeneous_rg(P_est)
+    # embed the observed and bootstrapped matrices together --------------------------------
+    yhat_est = UASE([A_obs, A_est], d=d)
+    # do a test between the obs and the bootstrap, get a p-value ---------------------------------
+    p_val = test_temporal_displacement_two_times(yhat_est, n, n_sim=Q)
+    return p_val, A_est
+    
+    
+# Function to plot ROC curves
+def plot_roc(ax, indices, title):
+    for i in indices:
+        p_hat_list = p_list_allnames[i]
+        roc = []
+        alphas = []
+        for alpha in np.linspace(0, 1, 100):
+            alphas.append(alpha)
+            num_below_alpha = sum(p_hat_list < alpha)
+            roc_point = num_below_alpha / len(p_hat_list)
+            roc.append(roc_point)
+
+        score = np.round(compute_roc_and_areas(p_hat_list, significance_level=0.05)['total_area'], 3)
+
+        ax.plot(np.linspace(0, 1, 2), np.linspace(0, 1, 2), linestyle="--", c="grey")
+        ax.plot(alphas, roc, color=colors[i], label=(labels[i]) + ",  $S=$" + str(score))
+
+    ax.tick_params(axis='both', which='major', labelsize=15)
+    ax.set_aspect('equal', adjustable='box')
+    ax.legend(loc="upper left", bbox_to_anchor=(0, 1), fontsize=10)
+    ax.set_title(title, fontsize=16)
+    
+    
+def plot_ellipse(ax, mean, cov, color, lw=2):
+    eigenvalues, eigenvectors = np.linalg.eigh(cov)
+    order = eigenvalues.argsort()[::-1]
+    eigenvalues = eigenvalues[order]
+    eigenvectors = eigenvectors[:, order]
+    angle = np.degrees(np.arctan2(*eigenvectors[:, 0][::-1]))
+    width, height = 2 * np.sqrt(eigenvalues[:2])
+    ellipse = Ellipse(xy=mean, width=width, height=height, angle=angle, edgecolor=color, facecolor='none', lw=lw, label=f'Covariance Ellipse ({color})')
+    ax.add_patch(ellipse)
+
+
+
+# TO AVOID SINGULAR MATRIX ERROR
+def points_within_ellipse(points, mean, cov, regularization=1e-32, threshold=3):
+    try:
+        # Attempt to calculate the inverse of the covariance matrix
+        inv_cov = np.linalg.inv(cov)
+    except LinAlgError:
+        # If the matrix is singular, regularize and retry
+        cov += np.eye(cov.shape[0]) * regularization
+        inv_cov = np.linalg.inv(cov)
+    
+    # Calculate the Mahalanobis distance from the mean
+    diff = points - mean
+    mahalanobis_distances = np.sum(diff @ inv_cov * diff, axis=1)
+    
+    # Points within the ellipse have a Mahalanobis distance <= threshold
+    return mahalanobis_distances <= threshold
+    
+    
+def plot_ellipse_3mahals(ax, mean, cov, color='blue', lw=1):
+    """
+    Plot an ellipse representing the covariance matrix and 1,2,3 SDs
+    
+    Parameters:
+    - ax: matplotlib axis to plot on.
+    - mean: 2D array for the center of the ellipse.
+    - cov: 2x2 covariance matrix.
+    - color: Color of the ellipse.
+    - lw: Line width.
+    """
+    # Eigenvalues and eigenvectors for the covariance matrix
+    vals, vecs = np.linalg.eigh(cov)
+    
+    # Sort the eigenvalues and corresponding eigenvectors in descending order
+    order = vals.argsort()[::-1]
+    vals = vals[order]
+    vecs = vecs[:, order]
+    
+    # Calculate angle of ellipse based on largest eigenvector
+    angle = np.degrees(np.arctan2(*vecs[:, 0][::-1]))
+    
+    # Define standard deviations to plot (1, 2, and 3 SDs)
+    std_devs = [1, 2, 3]
+    
+    for std_dev in std_devs:
+        # Width and height of ellipse correspond to 2*sqrt(eigenvalue)
+        width, height = 2 * std_dev * np.sqrt(vals)
+        
+        # Create and add ellipse patch
+        ell = Ellipse(xy=mean, width=width, height=height, angle=angle, 
+                      color=color, lw=lw, fill=False, alpha=0.8)
+        ax.add_patch(ell)
+
+
+def plot_ellipse_3rd_mahals(ax, mean, cov, color='blue', lw=1):
+    """
+    Plot an ellipse representing the covariance matrix at 3 SDs
+    
+    Parameters:
+    - ax: matplotlib axis to plot on.
+    - mean: 2D array for the center of the ellipse.
+    - cov: 2x2 covariance matrix.
+    - color: Color of the ellipse.
+    - lw: Line width.
+    """
+    # Eigenvalues and eigenvectors for the covariance matrix
+    vals, vecs = np.linalg.eigh(cov)
+    
+    # Sort the eigenvalues and corresponding eigenvectors in descending order
+    order = vals.argsort()[::-1]
+    vals = vals[order]
+    vecs = vecs[:, order]
+    
+    # Calculate angle of ellipse based on largest eigenvector
+    angle = np.degrees(np.arctan2(*vecs[:, 0][::-1]))
+    
+    std_dev = 3
+    # Width and height of ellipse correspond to 2*sqrt(eigenvalue)
+    width, height = 2 * std_dev * np.sqrt(vals)
+    
+    # Create and add ellipse patch
+    ell = Ellipse(xy=mean, width=width, height=height, angle=angle, 
+                    color=color, lw=lw, fill=False, alpha=0.8)
+    ax.add_patch(ell)
+  
+  
+    
+    
+# %%%%%%%%%%%%%%%%%%%%%%%%%% all above are defo in the code
 
 def parametric_bootstrap(A, d, B, return_P_hat=False, sparse=False, verbose=False):
     """
@@ -127,115 +593,12 @@ def create_single_parametric_bootstrap_cropPto0_1range(A, d, Q=1000):
     return p_val, A_star[0]
         
         
-def create_single_XXT_bootstrap_cropPto0_1range(A, d, Q=1000):
-    """
-    Generates a single bootstrapped adjacency matrix from a single adjacency matrix A.
 
-    input:
-    A: (numpy array (n, n)) adjacency matrix
-    d: (int) embedding dimension. In theory the rank of the noise-free A matrix.
-    Q: (int) number of simulations in the paired exchangeability test.
-
-    output:
-    A_star: (numpy array (n, n)) bootstrapped adjacency matrix
-    p_val: (float) p-value from the exch test between the obs and the bootstrapped matrix
-    """
-
-    # Compute ONLY the left spectral embeddings of A
-    X_hat = single_spectral_X(A, d)  # left
-
-    # Compute the estimated probability matrix
-    P_hat = X_hat @ X_hat.T
-
-    # Check if P_hat is a valid probability matrix
-    if np.min(P_hat) < 0 or np.max(P_hat) > 1:
-        warnings.warn("P_hat contains values outside of [0,1]. The values outside this range will be clipped to lie in the range.")
         
-    # Clip values in P_hat to be between 0 and 1
-    P_hat = np.clip(P_hat, 0, 1)
-    
-    # Check the values in P_hat have been clipped 
-    if np.min(P_hat) < 0 or np.max(P_hat) > 1:
-        warnings.warn("P_hat contains values outside of [0,1] after the clipping code, please check the function.")
-
-    A_star = np.array([make_inhomogeneous_rg(P_hat)])
-
-    # embed the observed and bootstrapped matrix together
-    yhat_est = UASE([A, A_star[0]], d=d)
-    # do a test between the obs and the bootstrap, get a p-value ---------------------------------
-    p_val = test_temporal_displacement_two_times(yhat_est, n=A.shape[0], n_sim=Q) 
-
-    return p_val, A_star[0]
-        
-        
-def create_single_YYT_bootstrap_cropPto0_1range(A, d, Q=1000):
-    """
-    Generates a single bootstrapped adjacency matrix from a single adjacency matrix A.
-
-    input:
-    A: (numpy array (n, n)) adjacency matrix
-    d: (int) embedding dimension. In theory the rank of the noise-free A matrix.
-    Q: (int) number of simulations in the paired exchangeability test.
-
-    output:
-    A_star: (numpy array (n, n)) bootstrapped adjacency matrix
-    p_val: (float) p-value from the exch test between the obs and the bootstrapped matrix
-    """
-
-    # Compute ONLY the left spectral embeddings of A
-    Y_hat = single_spectral_Y(A, d)  # right
-
-    # Compute the estimated probability matrix
-    P_hat = Y_hat @ Y_hat.T
-
-    # Check if P_hat is a valid probability matrix
-    if np.min(P_hat) < 0 or np.max(P_hat) > 1:
-        warnings.warn("P_hat contains values outside of [0,1]. The values outside this range will be clipped to lie in the range.")
-        
-    # Clip values in P_hat to be between 0 and 1
-    P_hat = np.clip(P_hat, 0, 1)
-    
-    # Check the values in P_hat have been clipped 
-    if np.min(P_hat) < 0 or np.max(P_hat) > 1:
-        warnings.warn("P_hat contains values outside of [0,1] after the clipping code, please check the function.")
-
-    A_star = np.array([make_inhomogeneous_rg(P_hat)])
-
-    # embed the observed and bootstrapped matrix together
-    yhat_est = UASE([A, A_star[0]], d=d)
-    # do a test between the obs and the bootstrap, get a p-value ---------------------------------
-    p_val = test_temporal_displacement_two_times(yhat_est, n=A.shape[0], n_sim=Q) 
-
-    return p_val, A_star[0]
         
         
 
-def row_sample_with_replacement(A, B):
-    """
-    Implemented for just a single bootstrap sample for now
 
-    input:
-    A: (numpy array (n, n)) adjacency matrix
-    B: (int) number of bootstrap samples to take
-
-    output:
-    A_star: (numpy array (B, n, n)) bootstrapped adjacency matrices
-    """
-
-    # this is the number of nodes
-    n = A.shape[0]
-
-    # initialize an array to store the bootstrapped adjacency matrices
-    A_row_jumbles = np.zeros((B, n, n))
-
-    for i in range(B):
-        # for each bootstrap sample, select which rows to put in the new matrix
-        idx = np.random.choice(n, size=n, replace=True)
-        for j in range(n):
-            # put the rows in the new matrix
-            A_row_jumbles[i][j, :] += A[idx[j], :]
-
-    return A_row_jumbles
 
 
 def edgelist_jackknife(A, B, num_times):
@@ -256,71 +619,13 @@ def edgelist_jackknife(A, B, num_times):
     
     
     
-def edgelist_sample_with_replacement(A):
-    """Actually just samples with replacement. As a binary setting, any edge selected more than once will be set to 1"""
-    number_edges = np.count_nonzero(A)
-    # find the edge locations
-    edges = np.transpose(np.nonzero(A))
-    # sample the edges with replacement
-    edge_idx = random.choices(range(0,number_edges), k=number_edges)
-    # remove duplicates
-    edge_idx = list(set(edge_idx))
-    # create an array from edges with the sampled indices
-    edge_sample = edges[edge_idx]
-    n = A.shape[0]
-    A_new = np.zeros((n,n))
-    # populate A_new with a 1 where edge_sample is the index
-    for e in range(len(edge_sample)):
-        edge_id = edge_sample[e]
-        A_new[edge_id[0], edge_id[1]] = 1
-    
-    return(A_new)
-    
-    
-def edgelist_sample_with_replacement_addRandomEdges(A):
-    """Actually just samples with replacement. As a binary setting, any edge selected more than once will be set to 1
-    Random edges will be populated so that the observed and the bootstrapped matrix have the same number of edges
-    """
-    number_edges = np.count_nonzero(A)
-    # find the edge locations
-    edges = np.transpose(np.nonzero(A))
-    # sample the edges with replacement
-    edge_idx = random.choices(range(0,number_edges), k=number_edges)
-    # remove duplicates
-    edge_idx = list(set(edge_idx))
-    # create an array from edges with the sampled indices
-    edge_sample = edges[edge_idx]
-    n = A.shape[0]
-    A_new = np.zeros((n,n))
-    # populate A_new with a 1 where edge_sample is the index
-    for e in range(len(edge_sample)):
-        edge_id = edge_sample[e]
-        A_new[edge_id[0], edge_id[1]] = 1
-        
-    # add in random edges
-    num_to_add = number_edges - len(edge_sample)
-    while num_to_add > 0:
-        i, j = np.random.randint(low=0, high=n, size=2)
-        # check not in edges
-        if A_new[i, j] == 0:
-            A_new[i, j] = 1
-            # if not in edge, add to edge_sample, else repeat loop
-            num_to_add -= 1
-    
-    return A_new
+
     
     
 
 
-"""This is needed for the test_bootstrap function"""
-@nb.njit
-def P_est_from_A_obs(n, A_obs, n_neighbors, indices):
-    P_est = np.zeros((n, n))
-    for i in range(n):
-        idx = indices[i]
-        A_i = (1 / n_neighbors) * np.sum(A_obs[:, idx], axis=1)
-        P_est[:, i] = A_i
-    return P_est
+
+
 
 
 """This takes in an adjacency matrix,
@@ -379,124 +684,9 @@ def get_node_to_edges(edge_list, n):
     return node_to_edges
 
 
-@nb.njit
-def P_est_from_edge_list(n, node_to_edges, n_neighbors, indices):
-    P_est = np.zeros((n, n))
-    for i in range(n):
-        idx_set = set(indices[i])
-        A_i = np.zeros(n)
-        for node in idx_set:
-            for edge in node_to_edges[node]:
-                A_i[edge] += 1
-        A_i = (1 / n_neighbors) * A_i
-        P_est[:, i] = A_i
-    return P_est
 
 
-def knn_bootstraps(
-    A_obs,
-    d,
-    B=1,
-    n_neighbors=5,
-    embedding_function=UASE,
-    make_hollow=False,
-    sparse_matrix=True,
-    verbose=True,
-):
-    """
-    Computes B knn bootstraps from observed adjacency matrix A_obs
-    """
-    n = A_obs.shape[0]
 
-    # Make sure A_obs matches the expected format
-    if sparse.issparse(A_obs) and not sparse_matrix:
-        A_obs = A_obs.toarray()
-    elif not sparse.issparse(A_obs) and sparse_matrix:
-        A_obs = sparse.csr_matrix(A_obs)
-
-    if verbose:
-        print("Embedding the graph...")
-
-    # Embed the graph
-    yhat = embedding_function([A_obs], d=d, flat=True, sparse_matrix=sparse_matrix)
-
-    if verbose:
-        print("Estimating the P matrix...")
-
-    # run a k-NN on the embedding yhat
-    nbrs = NearestNeighbors(
-        n_neighbors=n_neighbors, algorithm="ball_tree", metric="minkowski", p=2
-    ).fit(yhat)
-    distances, indices = nbrs.kneighbors(yhat)
-
-    # Estimate the P matrix
-    if sparse_matrix:
-        A_edge_list = np.array(A_obs.nonzero()).T
-        A_node_to_edges = get_node_to_edges(A_edge_list, n)
-        P_est = P_est_from_edge_list(
-            n, A_node_to_edges, n_neighbors=n_neighbors, indices=indices
-        )
-    else:
-        P_est = P_est_from_A_obs(n, A_obs, n_neighbors=n_neighbors, indices=indices)
-
-    if make_hollow:
-        np.fill_diagonal(P_est, 0)
-
-    if verbose:
-        print("Generating bootstraps...")
-
-    # Draw the A from the estimated P matrix
-    if verbose:
-        A_bootstraps = []
-        if sparse_matrix:
-            for i in tqdm(range(B)):
-                A_bootstraps.append(make_inhomogeneous_rg_sparse(P_est))
-        else:
-            for i in tqdm(range(B)):
-                A_bootstraps.append(make_inhomogeneous_rg(P_est))
-    else:
-        A_bootstraps = []
-        if sparse_matrix:
-            for i in range(B):
-                A_bootstraps.append(make_inhomogeneous_rg_sparse(P_est))
-        else:
-            for i in range(B):
-                A_bootstraps.append(make_inhomogeneous_rg(P_est))
-
-    return A_bootstraps
-
-
-def create_single_kNN_bootstrap(A, d, Q=1000, n_neighbors=5):
-    n = A.shape[0]
-    A_obs = A.copy()
-
-    # Embed the graphs -------------------------------
-
-    yhat = UASE([A], d=d, flat=True)
-
-    # run a k-NN on the embedding yhat
-    # Here we use Minkowski distance, with p=2 (these are the defaults),
-    # which corresponds to Euclidean distance
-    from sklearn.neighbors import NearestNeighbors
-
-    nbrs = NearestNeighbors(
-        n_neighbors=n_neighbors, algorithm="ball_tree", metric="minkowski", p=2
-    ).fit(yhat)
-    distances, indices = nbrs.kneighbors(yhat)
-
-    # Estimate the P matrix -------------------------------
-    P_est = P_est_from_A_obs(n, A_obs, n_neighbors=n_neighbors, indices=indices)
-
-    # Bootstrap -----------------------------------------
-    A_est = make_inhomogeneous_rg(P_est)
-
-    # embed the observed and bootstrapped matrices together --------------------------------
-    yhat_est = UASE([A_obs, A_est], d=d)
-
-    # do a test between the obs and the bootstrap, get a p-value ---------------------------------
-    p_val = test_temporal_displacement_two_times(yhat_est, n, n_sim=Q)
-
-    return p_val, A_est
 
 def create_single_kNN_n2v_bootstrap(A, d, Q=1000, n_neighbors=5):
     n = A.shape[0]
@@ -540,104 +730,10 @@ def check_matrix_range(matrix):
         print("Matrix values are within the range [0, 1].")
 
 
-def multiply_with_weights(A, w1, w2):
-    # Reshape w1 and w2 to have dimensions (n, 1)
-    w1_reshaped = w1[:, np.newaxis]  # shape (n, 1)
-    w2_reshaped = w2[np.newaxis, :]  # shape (1, n)
-
-    # Perform element-wise multiplication
-    M = w1_reshaped * w2_reshaped * A
-
-    return M
 
 
-"""Should work for estimating bootstraps of A that can be weighted and directed"""
 
 
-def test_bootstrap_universal(A, d, B=100, n_neighbors=5):
-    n = A.shape[0]
-    A_obs = A.copy()
-
-    # Embed the graphs -------------------------------
-    yhat = UASE([A], d=d, flat=True)
-
-    # run a k-NN on the embedding yhat
-    # Here we use Minkowski distance, with p=2 (these are the defaults),
-    # which corresponds to Euclidean distance
-    from sklearn.neighbors import NearestNeighbors
-
-    nbrs = NearestNeighbors(
-        n_neighbors=n_neighbors, algorithm="ball_tree", metric="minkowski", p=2
-    ).fit(yhat)
-    distances, indices = nbrs.kneighbors(yhat)
-
-    # Estimate the "weighted" P matrix (idk how you'd sample from this) -------------------------------
-    P_est = P_est_from_A_obs(n, A_obs, n_neighbors=n_neighbors, indices=indices)
-
-    # Calculate the in and out weight vectors of A_obs -------------------------------
-    out_weights = np.sum(A_obs, axis=1)  # row sum
-    in_weights = np.sum(A_obs, axis=0)  # column sum
-
-    # Adjusted P_est matrix ( not sure if this will be in [0,1]) -------------------------------
-    P_est_adj = np.zeros((n, n))
-    for i in range(n):
-        for j in range(n):
-            if (out_weights[i] * in_weights[j]) == 0:
-                P_est_adj[i, j] = 0
-            else:
-                P_est_adj[i, j] = (1 / (out_weights[i] * in_weights[j])) * P_est[i, j]
-
-    # Check matrix range
-    check_matrix_range(P_est_adj)
-
-    # Bootstrap -----------------------------------------
-    # B = 100
-    p_vals = []
-    A_boots = []
-    for i in range(B):
-        A_est_adj = make_inhomogeneous_rg(P_est_adj)
-        A_est = multiply_with_weights(out_weights, in_weights, A_est_adj)[0]
-
-        yhat_est = UASE([A_obs, A_est], d=d)
-        p_val = test_temporal_displacement_two_times(yhat_est, n)
-        p_vals.append(p_val)
-        A_boots.append(A_est)
-
-    return p_vals, A_boots
 
 
-"""Should work for estimating bootstraps of A that can be weighted and directed"""
 
-
-def create_single_bootstrap_weighted_poisson(A, d, Q=1000, n_neighbors=5):
-    n = A.shape[0]
-    A_obs = A.copy()
-
-    # Embed the graphs -------------------------------
-
-    yhat = UASE([A], d=d, flat=True)
-
-    # run a k-NN on the embedding yhat
-    # Here we use Minkowski distance, with p=2 (these are the defaults),
-    # which corresponds to Euclidean distance
-    from sklearn.neighbors import NearestNeighbors
-
-    nbrs = NearestNeighbors(
-        n_neighbors=n_neighbors, algorithm="ball_tree", metric="minkowski", p=2
-    ).fit(yhat)
-    distances, indices = nbrs.kneighbors(yhat)
-
-    # Estimate the P matrix -------------------------------
-    P_est = P_est_from_A_obs(n, A_obs, n_neighbors=n_neighbors, indices=indices)
-
-    # Bootstrap -----------------------------------------
-    # this samples from the poisson model
-    A_est = np.random.poisson(P_est)
-
-    # embed the observed and bootstrapped matrices together --------------------------------
-    yhat_est = UASE([A_obs, A_est], d=d)
-
-    # do a test between the obs and the bootstrap, get a p-value ---------------------------------
-    p_val = test_temporal_displacement_two_times(yhat_est, n, n_sim=Q)
-
-    return p_val, A_est
