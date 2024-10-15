@@ -434,9 +434,11 @@ def points_within_ellipse(points, mean, cov, regularization=1e-32, threshold=3):
     return mahalanobis_distances <= threshold
     
     
+    
+    
 def plot_ellipse_3mahals(ax, mean, cov, color='blue', lw=1):
     """
-    Plot an ellipse representing the covariance matrix and 1,2,3 SDs
+    Plot an ellipse representing the covariance matrix.
     
     Parameters:
     - ax: matplotlib axis to plot on.
@@ -467,7 +469,6 @@ def plot_ellipse_3mahals(ax, mean, cov, color='blue', lw=1):
         ell = Ellipse(xy=mean, width=width, height=height, angle=angle, 
                       color=color, lw=lw, fill=False, alpha=0.8)
         ax.add_patch(ell)
-
 
 def plot_ellipse_3rd_mahals(ax, mean, cov, color='blue', lw=1):
     """
@@ -502,6 +503,99 @@ def plot_ellipse_3rd_mahals(ax, mean, cov, color='blue', lw=1):
   
   
     
+def get_score(A,d,B=100,Q=1000,seed=None,f=create_single_kNN_bootstrap,  *args, **kwargs):
+    if(seed):
+        random.seed(seed)
+        np.random.seed(100)
+    p_vals = []
+    A_boots_list = []
+
+    for b in tqdm(range(B)):
+        p_val, A_boots = f(dense_adj, d=d, Q=1000, *args, **kwargs)
+        p_vals.append(p_val)
+        A_boots_list.append(A_boots)
+
+    # Provided code
+    p_hat_list = p_vals
+    roc = []
+    alphas = []
+
+    for alpha in np.linspace(0, 1, 100):
+        alphas.append(alpha)
+        num_below_alpha = sum(p_hat_list < alpha)
+        roc_point = num_below_alpha / len(p_hat_list)
+        roc.append(roc_point)
+
+    # Get the power at the 5% significance level
+    power_significance = 0.05
+    power_idx = alphas.index(min(alphas, key=lambda x: abs(x - power_significance)))
+    power = roc[power_idx]
+    
+    # Calculate the area between ROC and y=x line
+    x = np.linspace(0, 1, 100)
+    roc_interpolated = np.interp(x, alphas, roc)
+
+    # Compute areas
+    area_above, area_below = compute_area_above_below_curve(x, roc_interpolated)
+    total_area = area_above + area_below
+
+    return total_area, power, alphas, roc
+    
+    
+    
+def create_fuzziness_matrix(yadf, d, n):
+    """
+    Creates a fuzziness matrix by analyzing node data and identifying points within a certain ellipse
+    based on the mean and covariance of the data.
+
+    Parameters:
+    yadf (DataFrame): Input data frame containing node and matrix data.
+    d (int): Number of dimensions to consider.
+    n (int): Number of nodes to process.
+
+    Returns:
+    in_cov_friends_symm (2D array): The symmetric fuzziness matrix.
+    """
+    # Initialize the fuzziness matrix
+    in_cov_friends = np.zeros((n, n))
+    
+    for i in range(n):
+        # Filter data for the specific node number and select the relevant dimensions
+        node_number = i
+        data_d_dim = yadf[yadf["NodeNumber"] == node_number].iloc[:, 0:d].to_numpy()
+
+        # Calculate the mean and covariance for all d dimensions
+        mean_d_dim = np.mean(data_d_dim, axis=0)
+        cov_d_dim = np.cov(data_d_dim, rowvar=False)
+
+        # Use the first point corresponding to the node_number in matrix 0 as the center
+        point = data_d_dim[0]
+        obs_points = yadf[yadf["Matrix"] == 0].iloc[:, 0:d].to_numpy()
+
+        # Extract the first two dimensions for 2D plotting and calculations
+        obs_points_2d = obs_points[:, 0:2]
+
+        # Find points within the ellipse
+        inside_ellipse = points_within_ellipse(obs_points_2d, point[:2], cov_d_dim[:2, :2])
+
+        # Extract node numbers for points inside the ellipse
+        node_numbers_inside_ellipse = yadf[yadf["Matrix"] == 0].iloc[inside_ellipse].index.tolist()
+
+        # Update the fuzziness matrix for this node
+        in_cov_friends[i, node_numbers_inside_ellipse] = 1
+
+    # Symmetrize the fuzziness matrix
+    in_cov_friends_symm = np.minimum(in_cov_friends, in_cov_friends.T)
+    
+    return in_cov_friends_symm
+
+
+
+
+
+
+
+
     
 # %%%%%%%%%%%%%%%%%%%%%%%%%% all above are defo in the code
 
@@ -682,9 +776,6 @@ def get_node_to_edges(edge_list, n):
     for edge in edge_list:
         node_to_edges[edge[1]].append(edge[0])
     return node_to_edges
-
-
-
 
 
 
