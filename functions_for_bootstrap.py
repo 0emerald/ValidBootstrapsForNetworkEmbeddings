@@ -11,6 +11,8 @@ import random
 from numba.typed import List, Dict
 from numba import types
 from numba.types import ListType
+from numpy.linalg import LinAlgError
+
 
 
 int_list_type = ListType(types.int32)
@@ -101,6 +103,44 @@ def compute_roc_and_areas(p_hat_list, significance_level=0.05):
         "area_below": area_below,
         "total_area": total_area
     }
+
+
+
+# Calculate the area between ROC and y=x line
+def compute_area_above_below_curve(x, y):
+    area_above = 0.0
+    area_below = 0.0
+
+    for i in range(1, len(x)):
+        x0, x1 = x[i - 1], x[i]
+        y0, y1 = y[i - 1], y[i]
+        line0, line1 = x0, x1  # Since line y = x
+
+        if y1 == y0:  # Vertical segment
+            if y0 > x0:
+                area_above += (y0 - x0) * (x1 - x0)
+            else:
+                area_below += (x0 - y0) * (x1 - x0)
+            continue
+
+        # Find intersection with y = x
+        if (y0 >= x0 and y1 >= x1) or (y0 <= x0 and y1 <= x1):
+            if y0 >= x0 and y1 >= x1:
+                area_above += 0.5 * (y0 + y1 - x0 - x1) * (x1 - x0)
+            else:
+                area_below += 0.5 * (x0 + x1 - y0 - y1) * (x1 - x0)
+        else:
+            x_intersect = x0 + (x0 - y0) * (x1 - x0) / (y1 - y0)
+            if y0 < x0:
+                area_below += 0.5 * (x0 - y0) * (x_intersect - x0)
+                area_above += 0.5 * (y1 - x1) * (x1 - x_intersect)
+            else:
+                area_above += 0.5 * (y0 - x0) * (x_intersect - x0)
+                area_below += 0.5 * (x1 - y1) * (x1 - x_intersect)
+
+    return area_above, area_below
+
+
 
 
 def edgelist_sample_with_replacement_addRandomEdges_v2(A):
@@ -511,7 +551,7 @@ def get_score(A,d,B=100,Q=1000,seed=None,f=create_single_kNN_bootstrap,  *args, 
     A_boots_list = []
 
     for b in tqdm(range(B)):
-        p_val, A_boots = f(dense_adj, d=d, Q=1000, *args, **kwargs)
+        p_val, A_boots = f(A, d=d, Q=1000, *args, **kwargs)
         p_vals.append(p_val)
         A_boots_list.append(A_boots)
 
@@ -592,7 +632,21 @@ def create_fuzziness_matrix(yadf, d, n, threshold=3):
 
 
 
-
+def uncertainty_score(E,A):
+    ## Takes an adjacency matrix A and an embedding E and averages the length of all edges of A in E
+    n = A.shape[0]
+    score = 0
+    meandist = 0
+    edgecount = 0
+    for i in range(n):
+        for j in range(n):
+            edgecount += A[i,j]
+            meandist += A[i,j] * np.sqrt((np.linalg.norm(E[i,:] - E[j,:])))
+    meandist = meandist / edgecount
+    for i in range(n):
+        for j in range(n):
+            score += A[i,j] * (np.sqrt((np.linalg.norm(E[i,:] - E[j,:]))) - meandist)**2 /edgecount
+    return(np.sqrt(score))
 
 
 
