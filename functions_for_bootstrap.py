@@ -543,7 +543,7 @@ def get_score(A,d,B=100,Q=1000,seed=None,f=create_single_kNN_bootstrap,  *args, 
     
     
     
-def create_fuzziness_matrix(yadf, d, n):
+def create_fuzziness_matrix(yadf, d, n, threshold=3):
     """
     Creates a fuzziness matrix by analyzing node data and identifying points within a certain ellipse
     based on the mean and covariance of the data.
@@ -576,7 +576,7 @@ def create_fuzziness_matrix(yadf, d, n):
         obs_points_2d = obs_points[:, 0:2]
 
         # Find points within the ellipse
-        inside_ellipse = points_within_ellipse(obs_points_2d, point[:2], cov_d_dim[:2, :2])
+        inside_ellipse = points_within_ellipse(obs_points_2d, point[:2], cov_d_dim[:2, :2], threshold=threshold)
 
         # Extract node numbers for points inside the ellipse
         node_numbers_inside_ellipse = yadf[yadf["Matrix"] == 0].iloc[inside_ellipse].index.tolist()
