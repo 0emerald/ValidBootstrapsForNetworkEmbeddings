@@ -456,7 +456,9 @@ def plot_ellipse(ax, mean, cov, color, lw=2):
 
 
 
-# TO AVOID SINGULAR MATRIX ERROR
+    
+    
+    # TO AVOID SINGULAR MATRIX ERROR
 def points_within_ellipse(points, mean, cov, regularization=1e-32, threshold=3):
     try:
         # Attempt to calculate the inverse of the covariance matrix
@@ -468,7 +470,7 @@ def points_within_ellipse(points, mean, cov, regularization=1e-32, threshold=3):
     
     # Calculate the Mahalanobis distance from the mean
     diff = points - mean
-    mahalanobis_distances = np.sum(diff @ inv_cov * diff, axis=1)
+    mahalanobis_distances = np.sum(diff @ inv_cov * diff, axis=1)/cov.shape[0]
     
     # Points within the ellipse have a Mahalanobis distance <= threshold
     return mahalanobis_distances <= threshold
@@ -648,7 +650,7 @@ def uncertainty_score(E,A):
 
 
     
-def get_friends(yadf,threshold=3):
+def get_friends(yadf,d,threshold=3):
     """"create an adjacency matrix of nodes that overlap in uncertainty"""
     n=np.int64(yadf.shape[0]/(1+np.max(yadf["Matrix"])))
     in_cov_friends = np.zeros((n,n))
@@ -683,7 +685,45 @@ def get_friends(yadf,threshold=3):
     
     
     
+def create_single_parametric_bootstrap_cropPto0_1range(A, d, Q=1000):
+    """
+    Generates a single bootstrapped adjacency matrix from a single adjacency matrix A.
+
+    input:
+    A: (numpy array (n, n)) adjacency matrix
+    d: (int) embedding dimension. In theory the rank of the noise-free A matrix.
+    Q: (int) number of simulations in the paired exchangeability test.
+
+    output:
+    A_star: (numpy array (n, n)) bootstrapped adjacency matrix
+    p_val: (float) p-value from the exch test between the obs and the bootstrapped matrix
+    """
+
+    # Compute the left and right spectral embeddings of A
+    X_hat = single_spectral_X(A, d)  # left
+
+    # Compute the estimated probability matrix
+    P_hat = X_hat @ X_hat.T
+
+    # Check if P_hat is a valid probability matrix
+    if np.min(P_hat) < 0 or np.max(P_hat) > 1:
+        warnings.warn("P_hat contains values outside of [0,1]. The values outside this range will be clipped to lie in the range.")
+        
+    # Clip values in P_hat to be between 0 and 1
+    P_hat = np.clip(P_hat, 0, 1)
     
+    # Check the values in P_hat have been clipped 
+    if np.min(P_hat) < 0 or np.max(P_hat) > 1:
+        warnings.warn("P_hat contains values outside of [0,1] after the clipping code, please check the function.")
+
+    A_star = np.array([make_inhomogeneous_rg(P_hat)])
+
+    # embed the observed and bootstrapped matrix together
+    yhat_est = UASE([A, A_star[0]], d=d)
+    # do a test between the obs and the bootstrap, get a p-value ---------------------------------
+    p_val = test_temporal_displacement_two_times(yhat_est, n=A.shape[0], n_sim=Q) 
+
+    return p_val, A_star[0]
     
     
     
@@ -738,48 +778,7 @@ def parametric_bootstrap(A, d, B, return_P_hat=False, sparse=False, verbose=Fals
 
 
 
-def create_single_parametric_bootstrap_cropPto0_1range(A, d, Q=1000):
-    """
-    Generates a single bootstrapped adjacency matrix from a single adjacency matrix A.
 
-    input:
-    A: (numpy array (n, n)) adjacency matrix
-    d: (int) embedding dimension. In theory the rank of the noise-free A matrix.
-    Q: (int) number of simulations in the paired exchangeability test.
-
-    output:
-    A_star: (numpy array (n, n)) bootstrapped adjacency matrix
-    p_val: (float) p-value from the exch test between the obs and the bootstrapped matrix
-    """
-
-    # Compute the left and right spectral embeddings of A
-    X_hat = single_spectral_X(A, d)  # left
-#    Y_hat = single_spectral_Y(A, d)  # right
-
-    # Compute the estimated probability matrix
-    P_hat = X_hat @ X_hat.T
-
-    # Check if P_hat is a valid probability matrix
-    if np.min(P_hat) < 0 or np.max(P_hat) > 1:
-        warnings.warn("P_hat contains values outside of [0,1]. The values outside this range will be clipped to lie in the range.")
-        
-    # Clip values in P_hat to be between 0 and 1
-    P_hat = np.clip(P_hat, 0, 1)
-    
-    # Check the values in P_hat have been clipped 
-    if np.min(P_hat) < 0 or np.max(P_hat) > 1:
-        warnings.warn("P_hat contains values outside of [0,1] after the clipping code, please check the function.")
-
-
-    A_star = np.array([make_inhomogeneous_rg(P_hat)])
-
-    # embed the observed and bootstrapped matrix together
-    yhat_est = UASE([A, A_star[0]], d=d)
-    # do a test between the obs and the bootstrap, get a p-value ---------------------------------
-    p_val = test_temporal_displacement_two_times(yhat_est, n=A.shape[0], n_sim=Q) 
-
-
-    return p_val, A_star[0]
         
         
 
