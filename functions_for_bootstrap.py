@@ -612,11 +612,8 @@ def create_fuzziness_matrix(yadf, d, n, threshold=3):
         point = data_d_dim[0]
         obs_points = yadf[yadf["Matrix"] == 0].iloc[:, 0:d].to_numpy()
 
-        # Extract the first two dimensions for 2D plotting and calculations
-        obs_points_2d = obs_points[:, 0:2]
-
         # Find points within the ellipse
-        inside_ellipse = points_within_ellipse(obs_points_2d, point[:2], cov_d_dim[:2, :2], threshold=threshold)
+        inside_ellipse = points_within_ellipse(obs_points, point, cov_d_dim, threshold=threshold)
 
         # Extract node numbers for points inside the ellipse
         node_numbers_inside_ellipse = yadf[yadf["Matrix"] == 0].iloc[inside_ellipse].index.tolist()
@@ -650,6 +647,50 @@ def uncertainty_score(E,A):
 
 
 
+    
+def get_friends(yadf,threshold=3):
+    """"create an adjacency matrix of nodes that overlap in uncertainty"""
+    n=np.int64(yadf.shape[0]/(1+np.max(yadf["Matrix"])))
+    in_cov_friends = np.zeros((n,n))
+    
+    for i in range(n):
+        # Filter data for node number and select the relevant dimensions
+        node_number = i
+        data_d_dim = yadf[yadf["NodeNumber"] == node_number].iloc[:, 0:d].to_numpy()
+
+        # Calculate the mean and covariance considering all d dimensions
+        mean_d_dim = np.mean(data_d_dim, axis=0)
+        cov_d_dim = np.cov(data_d_dim, rowvar=False)
+
+        # Use the point corresponding to the specific node_number in matrix 0 as the center
+        point = data_d_dim[0]
+        obs_points = yadf[yadf["Matrix"] == 0].iloc[:, 0:d].to_numpy()
+
+        # Filter points within the ellipse
+        inside_ellipse = points_within_ellipse(obs_points, point, cov_d_dim, threshold=threshold)
+
+        # Extract node numbers for points inside the ellipse
+        node_numbers_inside_ellipse = yadf[yadf["Matrix"] == 0].iloc[inside_ellipse].index.tolist()
+
+        # set in_cov_friends[i, node_numbers_inside_ellipse] = 1
+        in_cov_friends[i, node_numbers_inside_ellipse] = 1
+
+    # symmetrize the matrix in_cov_friends - 
+    # minimum means both must be 1
+    # maximum means at least one must be 1
+    in_cov_friends_symm = np.minimum(in_cov_friends, in_cov_friends.T)
+    return(in_cov_friends_symm)    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     
 # %%%%%%%%%%%%%%%%%%%%%%%%%% all above are defo in the code
 
