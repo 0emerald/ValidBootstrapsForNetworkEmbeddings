@@ -42,7 +42,6 @@ def plot_power(p_hat_list, plot=True):
     return power
     
     
-    
 def compute_roc_and_areas(p_hat_list, significance_level=0.05):
     """Plot the QQ-plot and compute the area between the x=y line and the curve, the 'Bootstrap Validity Score'"""
     roc = []
@@ -106,7 +105,6 @@ def compute_roc_and_areas(p_hat_list, significance_level=0.05):
     }
 
 
-
 # Calculate the area between ROC and y=x line
 def compute_area_above_below_curve(x, y):
     area_above = 0.0
@@ -140,8 +138,6 @@ def compute_area_above_below_curve(x, y):
                 area_below += 0.5 * (x1 - y1) * (x1 - x_intersect)
 
     return area_above, area_below
-
-
 
 
 def edgelist_sample_with_replacement_addRandomEdges_v2(A):
@@ -730,13 +726,7 @@ def create_single_parametric_bootstrap_cropPto0_1range(A, d, Q=1000):
     return p_val, A_star[0]
     
     
-    
-    
-    
-    
-    
-    
-# %%%%%%%%%%%%%%%%%%%%%%%%%% all above are defo in the code
+# %%%%%%%%%%%%%%%%%%%%%%%%%% 
 
 def parametric_bootstrap(A, d, B, return_P_hat=False, sparse=False, verbose=False):
     """
@@ -783,54 +773,15 @@ def parametric_bootstrap(A, d, B, return_P_hat=False, sparse=False, verbose=Fals
 
 
 
-        
-        
-
-        
-        
-        
-
-
-
-
-def edgelist_jackknife(A, B, num_times):
-    """
-    Pick a random entry and set it to zero
-    """
-    n = A.shape[0]
-    A_star = np.zeros((B, n, n))
-
-    for i in range(B):
-        A_star[i] = A.copy()
-        for j in range(num_times):
-            idx = np.random.choice(n, size=2, replace=True)
-            A_star[i][idx[0], idx[1]] = 0
-            A_star[i][idx[1], idx[0]] = 0
-
-    return A_star
-    
-    
-    
-
-    
-    
-
-
-
-
-
-
-"""This takes in an adjacency matrix,
-embeds the matrix via spectral embedding,
-finds the k-nearest neighbors of each node, 
-uses the A values of the k nearest neighbors to estimate the P matrix.
-You are your own first neighbour, so k=1 just gives P_est as A that is input. 
-It doesn't do a test!!!!!
-It just gives you B bootstrapped matrices for a given observed matrix!
-"""
-
-
 def test_bootstrap(A, d, B=100, n_neighbors=5):
+    """This takes in an adjacency matrix,
+    embeds the matrix via spectral embedding,
+    finds the k-nearest neighbors of each node, 
+    uses the A values of the k nearest neighbors to estimate the P matrix.
+    You are your own first neighbour, so k=1 just gives P_est as A that is input. 
+    It doesn't do a test!!!!!
+    It just gives you B bootstrapped matrices for a given observed matrix!
+    """	
     n = A.shape[0]
     A_obs = A.copy()
 
@@ -875,39 +826,6 @@ def get_node_to_edges(edge_list, n):
         node_to_edges[edge[1]].append(edge[0])
     return node_to_edges
 
-
-
-def create_single_kNN_n2v_bootstrap(A, d, Q=1000, n_neighbors=5):
-    n = A.shape[0]
-    A_obs = A.copy()
-
-    # Embed the graphs -------------------------------
-
-    yhat = unfolded_n2v([A], d=d, flat=True)
-
-    # run a k-NN on the embedding yhat
-    # Here we use Minkowski distance, with p=2 (these are the defaults),
-    # which corresponds to Euclidean distance
-    from sklearn.neighbors import NearestNeighbors
-
-    nbrs = NearestNeighbors(
-        n_neighbors=n_neighbors, algorithm="ball_tree", metric="minkowski", p=2
-    ).fit(yhat)
-    distances, indices = nbrs.kneighbors(yhat)
-
-    # Estimate the P matrix -------------------------------
-    P_est = P_est_from_A_obs(n, A_obs, n_neighbors=n_neighbors, indices=indices)
-
-    # Bootstrap -----------------------------------------
-    A_est = make_inhomogeneous_rg(P_est)
-
-    # embed the observed and bootstrapped matrices together --------------------------------
-    yhat_est = UASE([A_obs, A_est], d=d)
-
-    # do a test between the obs and the bootstrap, get a p-value ---------------------------------
-    p_val = test_temporal_displacement_two_times(yhat_est, n, n_sim=Q)
-
-    return p_val, A_est
 
 def check_matrix_range(matrix):
     min_val = np.min(matrix)
