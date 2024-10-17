@@ -12,7 +12,8 @@ from numba.typed import List, Dict
 from numba import types
 from numba.types import ListType
 from numpy.linalg import LinAlgError
-
+from matplotlib.lines import Line2D
+from matplotlib.patches import Ellipse
 
 
 int_list_type = ListType(types.int32)
@@ -184,8 +185,6 @@ def create_single_kNN_bootstrap(A, d, Q=1000, n_neighbors=5):
     # run a k-NN on the embedding yhat
     # Here we use Minkowski distance, with p=2 (these are the defaults),
     # which corresponds to Euclidean distance
-    from sklearn.neighbors import NearestNeighbors
-
     nbrs = NearestNeighbors(
         n_neighbors=n_neighbors, algorithm="ball_tree", metric="minkowski", p=2
     ).fit(yhat)
@@ -396,30 +395,36 @@ def P_est_from_edge_list(n, node_to_edges, n_neighbors, indices):
         P_est[:, i] = A_i
     return P_est
     
-    
 def create_single_kNN_prone_bootstrap(A, d, Q=1000, n_neighbors=5):
     n = A.shape[0]
     A_obs = A.copy()
+
     # Embed the graphs -------------------------------
     yhat = unfolded_prone(A, d=d, flat=True)
+
     # run a k-NN on the embedding yhat
     # Here we use Minkowski distance, with p=2 (these are the defaults),
     # which corresponds to Euclidean distance
-    from sklearn.neighbors import NearestNeighbors
+
     nbrs = NearestNeighbors(
         n_neighbors=n_neighbors, algorithm="ball_tree", metric="minkowski", p=2
     ).fit(yhat)
     distances, indices = nbrs.kneighbors(yhat)
+
     # Estimate the P matrix -------------------------------
     P_est = P_est_from_A_obs(n, A_obs, n_neighbors=n_neighbors, indices=indices)
+
     # Bootstrap -----------------------------------------
     A_est = make_inhomogeneous_rg(P_est)
+
     # embed the observed and bootstrapped matrices together --------------------------------
     yhat_est = UASE([A_obs, A_est], d=d)
+
     # do a test between the obs and the bootstrap, get a p-value ---------------------------------
     p_val = test_temporal_displacement_two_times(yhat_est, n, n_sim=Q)
+
+
     return p_val, A_est
-    
     
 # Function to plot ROC curves
 def plot_roc(ax, indices, title):
@@ -458,7 +463,7 @@ def plot_ellipse(ax, mean, cov, color, lw=2):
 
     
     
-    # TO AVOID SINGULAR MATRIX ERROR
+# TO AVOID SINGULAR MATRIX ERROR
 def points_within_ellipse(points, mean, cov, regularization=1e-32, threshold=3):
     try:
         # Attempt to calculate the inverse of the covariance matrix
@@ -474,7 +479,7 @@ def points_within_ellipse(points, mean, cov, regularization=1e-32, threshold=3):
     
     # Points within the ellipse have a Mahalanobis distance <= threshold
     return mahalanobis_distances <= threshold
-    
+
     
     
     
@@ -649,8 +654,7 @@ def uncertainty_score(E,A):
 
 
 
-    
-def get_friends(yadf,d,threshold=3):
+def get_friends(yadf,threshold=3):
     """"create an adjacency matrix of nodes that overlap in uncertainty"""
     n=np.int64(yadf.shape[0]/(1+np.max(yadf["Matrix"])))
     in_cov_friends = np.zeros((n,n))
@@ -681,7 +685,7 @@ def get_friends(yadf,d,threshold=3):
     # minimum means both must be 1
     # maximum means at least one must be 1
     in_cov_friends_symm = np.minimum(in_cov_friends, in_cov_friends.T)
-    return(in_cov_friends_symm)    
+    return(in_cov_friends_symm)   
     
     
     
