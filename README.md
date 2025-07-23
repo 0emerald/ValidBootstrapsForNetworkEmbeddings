@@ -21,14 +21,10 @@ The notebooks reproduce the main figures from the paper and allow experimentatio
 - `school_example.ipynb` - creates all other figures for the school data example. 
 
 
----
-
 ### 📊 Data
 
 - `ia-primary-school-proximity-attr.edges` - data for the Lyon School social network example
 
-
----
 
 ### ⚙️ Functions
 
