@@ -1,3 +1,17 @@
+# 📘 Project Overview
+
+This repository contains code and data accompanying the paper:
+
+**“Valid Bootstraps for Network Embeddings with Applications to Network Visualisation”**  
+(*https://arxiv.org/abs/2410.20895*)
+
+We provide implementations of our proposed network bootstrap methods, comparisons with existing approaches, and visualisations using both synthetic and real-world data.  
+The notebooks reproduce the main figures from the paper and allow experimentation with different settings and bootstrap variants.
+
+---
+
+## 📂 Contents
+
 ### Notebooks
 
 - `4comm_SBM_k_scores_SYMM.ipynb` - n=1000 4 community SBM, looks at Bootstrap Validity Score vs k for k=2,...,500 for ASE-kNN bootstrap and evaluates the Bootstrap Validity Score. 
@@ -7,11 +21,25 @@
 - `school_example.ipynb` - creates all other figures for the school data example. 
 
 
-### Data
+---
+
+### 📊 Data
+
 - `ia-primary-school-proximity-attr.edges` - data for the Lyon School social network example
 
 
-### Functions
+---
+
+### ⚙️ Functions
+
 - `embedding_functions.py` - contains functions for embedding networks and code for aired displacement test
 - `functions_for_bootstrap.py` - contains different functions for bootstrapping, and functions used within. Also functions for the plotting and visualisation support
 - `experiment_setup.py` - functions for the setup of synthetic examples and synthetic networks
+
+---
+
+- ## 📌 Highlights
+
+- All bootstrap methods can be evaluated using an **exchangeability test**, giving an empirical measure of validity.
+- The proposed **kNN-based bootstrap** passes this test in cases where standard methods fail.
+- Visualisation with **t-SNE** is integrated to demonstrate how uncertainty estimates can help detect spurious or misleading structure in low-dimensional embeddings.
